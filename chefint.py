@@ -12,35 +12,46 @@ class Chef:
         self.bakingdishes = {}
         
     def parse(self):        
+        
         self.recipename = re.match("(.*?)\.\n\n", self.script)
         self.script = re.sub(self.recipename.group(), "", self.script)
         if(self.recipename == None):
             print("Invalid recipe name")
             sys.exit(-1)
-        #Match a recipe name, first line of script, must end with a dot and two newlines.
-        #Replace this with nothing to allow for further matching.
+        
+        ## Match a recipe name, first line of script, must end with a dot and two newlines.
+        ## Replace this with nothing to allow for further matching.
         self.comment = re.match("(.*?)\n\n", self.script, re.DOTALL)        
-        #Find a comment, and replace it. 
+        
+        ## Find a comment, and replace it. 
         if self.comment != None and re.match("^Ingredients", self.comment.group()) == None:
-            #Make sure we do not replace the ingredient list.
+            ## Make sure we do not replace the ingredient list.
             self.script = re.sub(re.escape(self.comment.group()), "", self.script)
-            #Replace the comment with nothing.        
+            ## Replace the comment with nothing.        
+        
+        ## Find ingredient list.
         self.ingr = re.match("Ingredients\.\n", self.script)
-        #Find ingredient list.
+        
         if self.ingr == None:
             print("Ingredient list not found")
             sys.exit(-1)
+            
+        ##Again, replace with nothing.
         self.script = re.sub(self.ingr.group(), "", self.script, 1)
-        #Again, replace with nothing.
+        
+        ## Match ingredients.
         self.ingredients = re.findall("(([0-9]*) ?(k?g|pinch(?:es)?|m?l|dash(?:es)?|cups?|teaspoons?|tablespoons?)? ?([a-zA-Z0-9 ]+)\n)", self.script)
-        #Match ingredients.
+        
         self.ingredientlist = {}
+        
         for i in self.ingredients:
             if re.match(i[0], self.script) != None:
-                #Replace them with nothing, but only if they are exactly at the beginning of the script
-                #to avoid replacing axuiliary ingredients.
-                self.script = self.script.replace(i[0], "")                
-            #Type assignment is next. Note that chr() is not run on values until output. This is to allow arithmetic operations on liquids.
+                ## Replace them with nothing, but only if they are exactly at the beginning of the script
+                ##   to avoid replacing axuiliary ingredients.
+                self.script = self.script.replace(i[0], "")   
+                
+            ## Type assignment is next. Note that chr() is not run on values until output. 
+            ##   This is to allow arithmetic operations on liquids.
             if(i[2] in("dash", "cup", "l", "ml", "dashes", "cups")):
                 value = int(i[1])
                 type = "liquid"
@@ -51,24 +62,30 @@ class Chef:
                     value = None
                 type = "dry"
             self.ingredientlist[i[3]] = [value, type, i[3]]
-        #Find the method. This is where things get interesting.
+            
+        ## Find the method. This is where things get interesting.
         self.script = self.script.lstrip()
+        
         #self.meth = re.match("Method\.\n", self.script)            #SFM
         self.meth = re.match("(.+[\r\n]+)*?Method.\n", self.script)    #SFM
+        
+        ## Match anything up to two newlines.    
         self.script = re.sub(self.meth.group(), "", self.script, 1)    
         self.method = re.match("(.*?)\n\n", self.script, re.DOTALL)
-        #Match anything up to two newlines.    
+        
+        ## Run the script & Cook the food.
         self.execute(self.method.group(1))
-        #Run the script^H^H^H^H^H^H^H^H^H^H^H^H^HCook the food.
+        
+        ## Find output directive.
         serves = re.search("Serves ([0-9]+).", self.script)
-        #Find output directive.
         if serves != None:
             output = self.serve(int(serves.group(1)))
-            #Call function to return output
+            ## Call function to return output
             return output
         
     def ambigcheck(self, text, dish=False):
-        #A mixing bowl may not be used without a number if other mixing bowls use numbers. Same goes for baking dishes.
+        ## A mixing bowl may not be used without a number if other mixing bowls use numbers. 
+        ## Same goes for baking dishes.
         if re.match("the (1st|2nd|3rd|[0-9]+th) mixing bowl", text) != None:
             print("Ambigious mixing bowl")
             sys.exit(-1)
@@ -78,14 +95,14 @@ class Chef:
                 sys.exit(-1)
                 
     def valuecheck(self, ingredient):
-        #Ingredients may be defined without a value, but not used without one.
+        ## Ingredients may be defined without a value, but not used without one.
         if self.ingredientlist[ingredient][0] == None:
             print("Cooking time error: tried to access ingredient", ingredient + ", which is not ready for use.")
             sys.exit()
             
     def put(self, mixingbowl, value):
         #print 'Before put'
-        #Add an ingredient to a mixing bowl.
+        ## Add an ingredient to a mixing bowl.
         if mixingbowl == None:
             #print self.mixingbowls[0]
             if len(self.mixingbowls) > 0:
@@ -96,17 +113,17 @@ class Chef:
             #print 'After put'
             #print self.mixingbowls[0]
         else:
+            ## Numbered mixing bowls use their number - 1 as index.
             key = int(mixingbowl)-1            
             if not key in self.mixingbowls:
                 self.mixingbowls[key] = []                    
             #print self.mixingbowls[key]
             self.mixingbowls[key].append(value)    
             #print 'After put'
-            #print self.mixingbowls[key]            
-        #Numbered mixing bowls use their number - 1 as index.
+            #print self.mixingbowls[key]
         
     def fold(self, ingredient, mixingbowl):
-        #Opposite of put.
+        ## Opposite of put.
         if mixingbowl == None:
             key = 0
         else:
@@ -127,7 +144,7 @@ class Chef:
         self.mixingbowls[key][-1][0] += value
         
     def removeingredient(self, ingredient, mixingbowl):
-        #Subtraction
+        ## Subtraction
         value = self.ingredientlist[ingredient][0]
         if mixingbowl == None:
             key = 0
@@ -138,7 +155,7 @@ class Chef:
         self.mixingbowls[key][-1][0] -= value
         
     def combineingredient(self, ingredient, mixingbowl):
-        #Multiplication
+        ## Multiplication
         value = self.ingredientlist[ingredient][0]
         if mixingbowl == None:
             key = 0
@@ -149,7 +166,7 @@ class Chef:
         self.mixingbowls[key][-1][0] *= value
         
     def divideingredient(self, ingredient, mixingbowl):
-        #Division
+        ## Division
         value = self.ingredientlist[ingredient][0]
         if value == None:
             value = 1
@@ -160,7 +177,7 @@ class Chef:
         self.mixingbowls[key][-1][0] = float(self.mixingbowls[key][-1][0]/value)
         
     def stir(self,mixingbowl,minutes,ingredient):
-        #Roll ingredients
+        ## Roll ingredients
         if ingredient != None:
             value = self.ingredientlist[ingredient][0]
         else:
@@ -184,7 +201,7 @@ class Chef:
             #print 'Mixing Bowl ',key,': ',self.mixingbowls[key]
             
     def execute(self, text, loop=False):
-        #Main interpreting function.
+        ## Main interpreting function.
         excode = re.split("\.\s+", text)
         
         ## Split into sentences.
@@ -194,7 +211,7 @@ class Chef:
         excode[-1] = excode[-1][:-1] 
         
         for ex in excode:
-            #Do a series of regexps, call appropriate function.
+            ## Do a series of regexps, call appropriate function.
             put = re.search("^Put (?:the )?([a-zA-Z ]+) into (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?mixing bowl", ex)
             if put != None:
                 if put.group(2) == None:                    
@@ -237,7 +254,7 @@ class Chef:
             ## sfm 20181020 -- assuming this was copied incorrectly
             liquefy2 = re.search("Liquefy [a-zA-Z]", ex)
             if liquefy2 != None: #
-                self.ingredientlist[liquefy2.group(1)] #
+                self.ingredientlist[liquefy2.group(1)] 
                 continue
             
             clean = re.search("Clean the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl", ex)
@@ -314,7 +331,8 @@ class Chef:
                 souschef.parse()
                 readymixingbowls = souschef.mixingbowls                
                 self.mixingbowls[0].extend(readymixingbowls[0])
-            #Stir                                                                                                #SFM
+            
+            ## Stir                                                                                                #SFM
             stir = re.match("Stir(?: the (1st|2nd|3rd|[0-9]+th) mixing bowl)? for ([1-9]+) minutes?", ex)        #SFM
             if stir != None:                                                                                    #SFM
                 self.stir(stir.group(1),stir.group(2),None)    #Args: mixingbowl, minutes, ingredient                    #SFM
@@ -322,7 +340,7 @@ class Chef:
             if stir != None:                                                                                    #SFM
                 self.stir(stir.group(2),0,stir.group(1))    #Args: mixingbowl, minutes, ingredient                #SFM
             
-            # No standard keyword: look for a verb to begin a loop
+            ## No standard keyword: look for a verb to begin a loop
             verb = re.search("([a-zA-Z]+) the ([a-zA-Z ]+) ?(?!until)", ex)
             if verb != None:                
                 if "until" in verb.group():
@@ -339,11 +357,14 @@ class Chef:
                         verbw = verb.group(1)[:-1] + "i"
                     else:
                         verbw = verb.group(1)
-                    # Find everything in between the loop (TODO - watch out for nested loops with the same verb!)
+                    ## Find everything in between the loop 
+                    ## TODO - watch out for nested loops with the same verb!
                     #looptext = re.search(verb.group() + "\.((.*?)\s+[a-zA-Z]+ (?:the ([a-zA-Z ]+)) until " + verbw + "ed)", text, re.DOTALL|re.IGNORECASE)
                     looptext = re.search(verb.group() + "\.((.*?)\s+[a-zA-Z]+ (?:(the )?([a-zA-Z ]+)) until " + verbw + "ed)", text, re.DOTALL|re.IGNORECASE)
+                    
                     if not looptext:
                         print('Verb unmatched. Could not find "' + verbw + 'ed" in "' + text + '"')    
+                    
                     deltext =  re.split("\.\s+", looptext.group(1))
                     deltext = map(stripwhite, deltext)
                     for d in deltext:
