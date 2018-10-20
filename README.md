@@ -16,7 +16,7 @@ No, I adapted it from a [mysterious unknown author](http://web.archive.org/web/2
 
 ## Run
 
-`imporf chefint`\
+`import chefint`\
 `c = chefint.Chef("<Your Chef Script>")`\
 `output = c.parse()`
 
