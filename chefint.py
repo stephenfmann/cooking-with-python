@@ -374,7 +374,12 @@ class Chef:
                     if j[1] == "liquid":
                         value = chr(value)
                     output += str(value)
-        return output
+        ## "This is extended slice syntax. 
+        ##   It works by doing [begin:end:step] - 
+        ##   by leaving begin and end off and specifying a step of -1, 
+        ##   it reverses a string."
+        ##   - https://stackoverflow.com/questions/931092/reverse-a-string-in-python
+        return output[::-1] ## SFM: the loop outputs backwards, so reverse here
 
 if __name__ == "__main__":
     print("PyChef v0.0.1 by sp3tt, edited by sfm. This program is licensed under the GNU GPL.")
