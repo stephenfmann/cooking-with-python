@@ -21,3 +21,14 @@ No, I adapted it from a [mysterious unknown author](http://web.archive.org/web/2
 `output = c.parse()`
 
 Or run the script from shell with argument \<filename\> which contains the Chef script.
+
+## Examples
+Check out the three example files
+
+### helloworld.txt
+*from [David Morgan-Mar](http://www.dangermouse.net/esoteric/chef_hello.html)*\
+This recipe prints the immortal words "Hello world!", in a basically brute force way. It also makes a lot of food for one person.
+
+### cherrypi.txt
+*from me!*\
+Calculates the value of pie to an arbitrarily delicious degree of accuracy. You start with 1, 2 or 3 cherries; the more you add, the more deliciously accurate the pie will be. For every four cherries you use, your pie will gain about three more delicious decimal digits - that is, it will be approximately one thousand times more delicious.
