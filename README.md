@@ -23,7 +23,7 @@ No, I adapted it from a [mysterious unknown author](http://web.archive.org/web/2
 Or run the script from shell with argument \<filename\> which contains the Chef script.
 
 ## Examples
-Check out the three example files
+Check out these example files:
 
 ### helloworld.txt
 *from [David Morgan-Mar](http://www.dangermouse.net/esoteric/chef_hello.html)*\
