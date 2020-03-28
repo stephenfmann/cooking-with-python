@@ -1,4 +1,4 @@
-Fruit Loops
+Fruit Loops.
 
 Do we need to have 280 brands of breakfast cereal? No, probably not. But we have them for a reason - because some people like them. [https://github.com/joostrijneveld/Chef-Interpreter/blob/master/ChefInterpreter/FruitLoops.chef]
 
@@ -12,11 +12,11 @@ Ingredients.
 Method.
 Put milk into the mixing bowl.
 Prepare the loops.
-Add sugar.
-Sprinkle the chocolate sprinkles.
-Add chocolate sprinkles.
-Set aside.
-Sprinkle until sprinkled.
+	Add sugar.
+	Sprinkle the chocolate sprinkles.
+		Add chocolate sprinkles.
+		Set aside.
+	Sprinkle until sprinkled.
 Mix the loops until prepared.
 Add fruit.
 Pour contents of the mixing bowl into the baking dish.

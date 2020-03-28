@@ -326,7 +326,10 @@ class Chef:
                 self.put(adddry.group(1), [sum(dry), "dry", "sumofall"], text)
             auxiliary = re.match("Serve with ([a-zA-Z ]+)", ex)
             if auxiliary != None:                                
-                auxtext = re.search(auxiliary.group(1) + "\.\n\n(.*)", self.origscript, re.IGNORECASE|re.DOTALL)                
+                auxtext = re.search(auxiliary.group(1) + "\.\n\n(.*)", self.origscript, re.IGNORECASE|re.DOTALL)
+                if not auxtext: # error!
+                    print("A sub-recipe was listed but could not be found. Try hiring a new sous-chef?")
+                    raise IOError
                 souschef = Chef(auxtext.group(), copy.copy(self.mixingbowls))
                 souschef.parse()
                 readymixingbowls = souschef.mixingbowls                
@@ -350,20 +353,23 @@ class Chef:
                 if self.ingredientlist[verb.group(2)][0] == 0:
                     continue
                 else:
-                    # Verb Maintenance
+                    ## Verb Maintenance
                     if verb.group(1)[-1] == "e":
-                        verbw = verb.group(1)[:-1]
+                        verbw = verb.group(1)[:-1]          # Verbs that end in e need to drop it before adding ed below.
                     elif verb.group(1)[-1] == "y":
-                        verbw = verb.group(1)[:-1] + "i"
+                        verbw = verb.group(1)[:-1] + "i"    # Verbs that end in y need to swap it for an i before adding ed.
                     else:
-                        verbw = verb.group(1)
+                        verbw = verb.group(1)               # Any other verbs just need ed adding below.
                     ## Find everything in between the loop 
                     ## TODO - watch out for nested loops with the same verb!
+                    
                     #looptext = re.search(verb.group() + "\.((.*?)\s+[a-zA-Z]+ (?:the ([a-zA-Z ]+)) until " + verbw + "ed)", text, re.DOTALL|re.IGNORECASE)
-                    looptext = re.search(verb.group() + "\.((.*?)\s+[a-zA-Z]+ (?:(the )?([a-zA-Z ]+)) until " + verbw + "ed)", text, re.DOTALL|re.IGNORECASE)
+                    re_text = verb.group() + "\.((.*?)\s+[a-zA-Z]+ ?(?:(the )?([a-zA-Z ]+))? ?until " + verbw + "ed)"
+                    looptext = re.search(re_text, text, re.DOTALL|re.IGNORECASE)
                     
                     if not looptext:
-                        print('Verb unmatched. Could not find "' + verbw + 'ed" in "' + text + '"')    
+                        print('Verb unmatched. Could not find "' + re_text + ' in "' + text + '"')
+                        raise IOError
                     
                     deltext =  re.split("\.\s+", looptext.group(1))
                     deltext = map(stripwhite, deltext)
@@ -403,7 +409,7 @@ class Chef:
         return output[::-1] ## SFM: the loop outputs backwards, so reverse here
 
 if __name__ == "__main__":
-    print("PyChef v0.0.1 by sp3tt, edited by sfm. This program is licensed under the GNU GPL.")
+    #print("PyChef v0.0.1 by sp3tt, edited by sfm. This program is licensed under the GNU GPL.")
     try:
         f = open(sys.argv[1], "r")
         main = Chef(f.read())
