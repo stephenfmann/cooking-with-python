@@ -39,5 +39,6 @@ Calculates the value of pie to an arbitrarily delicious degree of accuracy. You 
 
 ## TODO
 
++ Either helloworld.txt or cherrypi.txt is putting things in the mixing bowl in the wrong order.
 + fibonacci.txt won't work. Maybe because auxiliary recipe.
 + functify the whole thing
