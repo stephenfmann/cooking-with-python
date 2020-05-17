@@ -36,9 +36,3 @@ This recipe prints the first 100 Fibonacci numbers. It uses an auxiliary recipe 
 ### cherrypi.txt
 *from me!*\
 Calculates the value of pie to an arbitrarily delicious degree of accuracy. You start with 1, 2 or 3 cherries; the more you add, the more deliciously accurate the pie will be. For every four cherries you use, your pie will gain about three more delicious decimal digits - that is, it will be approximately one thousand times more delicious.
-
-## TODO
-
-+ Either helloworld.txt or cherrypi.txt is putting things in the mixing bowl in the wrong order.
-+ Allow for loops within loops.
-+ fibonacci.txt won't work. Maybe because auxiliary recipe.
