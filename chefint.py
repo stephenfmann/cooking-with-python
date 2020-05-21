@@ -4,10 +4,7 @@
     See https://www.dangermouse.net/esoteric/chef.html for details.
 """
 
-import sys
-import re
-import random
-import copy
+import sys, re, random, copy
 
 class Chef:
     """
@@ -27,7 +24,7 @@ class Chef:
         """
         
         ## TODO: report line number.
-        print("Syntax error: "+message)
+        print(f"Syntax error: {message}")
         sys.exit(-1)
         
     def cooking_error(self,message):
@@ -36,7 +33,7 @@ class Chef:
         """
         
         ## TODO - report line number
-        print("Cooking time error: "+message)
+        print(f"Cooking time error: {message}")
         sys.exit()
     
     def parse(self):
@@ -165,7 +162,7 @@ class Chef:
         if mixingbowl:
             key = int(mixingbowl[:-2])-1
         
-        ## TODO - fix this (ingredient name and dry/liquid should not be overwritten
+        ## TODO - fix this (ingredient name and dry/liquid should not be overwritten)
         self.ingredientlist[ingredient] = self.mixingbowls[key].pop()
         
     def addingredient(self, ingredient, mixingbowl):
@@ -427,13 +424,13 @@ class Chef:
                 readymixingbowls = souschef.mixingbowls                
                 self.mixingbowls[0].extend(readymixingbowls[0])
             
-            ## P. Stir                                                                                                #SFM
-            stir = re.match("Stir(?: the (1st|2nd|3rd|[0-9]+th) mixing bowl)? for ([1-9]+) minutes?", ex)        #SFM
-            if stir != None:                                                                                    #SFM
-                self.stir(stir.group(1),stir.group(2),None)    #Args: mixingbowl, minutes, ingredient                    #SFM
-            stir = re.match("Stir (a-zA-Z0-9 )+ into the (1st|2nd|3rd|[0-9]+th) mixing bowl", ex)                #SFM
-            if stir != None:                                                                                    #SFM
-                self.stir(stir.group(2),0,stir.group(1))    #Args: mixingbowl, minutes, ingredient                #SFM
+            ## P. Stir
+            stir = re.match("Stir(?: the (1st|2nd|3rd|[0-9]+th) mixing bowl)? for ([1-9]+) minutes?", ex)
+            if stir != None:
+                self.stir(stir.group(1),stir.group(2),None)    #Args: mixingbowl, minutes, ingredient
+            stir = re.match("Stir (a-zA-Z0-9 )+ into the (1st|2nd|3rd|[0-9]+th) mixing bowl", ex)
+            if stir != None:
+                self.stir(stir.group(2),0,stir.group(1))    #Args: mixingbowl, minutes, ingredient
             
             ## Q. No standard keyword: look for a verb to begin a loop
             verb = re.search("([a-zA-Z]+) the ([a-zA-Z ]+) ?(?!until)", ex)
@@ -452,6 +449,7 @@ class Chef:
                         verbw = verb.group(1)[:-1] + "i"    # Verbs that end in y need to swap it for an i before adding ed.
                     else:
                         verbw = verb.group(1)               # Any other verbs just need ed adding below.
+                    
                     ## Find everything in between the loop 
                     ## TODO - watch out for nested loops with the same verb!
                     
@@ -460,7 +458,7 @@ class Chef:
                     looptext = re.search(re_text, text, re.DOTALL|re.IGNORECASE)
                     
                     if not looptext:
-                        print('Verb unmatched. Could not find "' + re_text + ' in "' + text + '"')
+                        print(f'Verb unmatched. Could not find "{re_text}" in "{text}"')
                         raise IOError
                     
                     deltext =  re.split("\.\s+", looptext.group(1))
@@ -473,9 +471,9 @@ class Chef:
                             break
                         if looptext.group(3) != None:
                             if looptext.group(3) == 'the ':
-                                ing = looptext.group(4)
+                                ing = looptext.group(4).rstrip()
                             else:
-                                ing = looptext.group(3)
+                                ing = looptext.group(3).rstrip()
                             self.ingredientlist[ing][0] -= 1
             if loop == True:
                 setaside = re.search("Set aside", ex)                
@@ -501,6 +499,7 @@ class Chef:
                     if j[1] == "liquid":
                         value = chr(value)
                     output += str(value)
+        
         """
             This is extended slice syntax.
             It works by doing [begin:end:step].
@@ -508,7 +507,6 @@ class Chef:
              it reverses a string.
             https://stackoverflow.com/questions/931092/reverse-a-string-in-python
         """
-        
         ## TODO -- one or other of the standard recipes is incorrectly reversed.
         return output[::-1] ## SFM: the loop outputs backwards, so reverse here
 
