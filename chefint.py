@@ -426,8 +426,17 @@ class Chef:
                 if not auxtext: # error!
                     logger.error("A sub-recipe was listed but could not be found. Try hiring a new sous-chef?")
                     raise IOError
-                souschef = Chef(auxtext.group(), copy.copy(self.mixingbowls))
-                souschef.parse()
+                
+                ## Quick fix to recursion error
+                try:
+                    souschef = Chef(auxtext.group(), copy.copy(self.mixingbowls))
+                    souschef.parse()
+                except RecursionError:
+                    msg = f'Error: Your sub-recipe {str(auxiliary.group(1))} contains a reference to itself. '+\
+                        'The kitchen is not equipped to handle infinite recursion.'
+                    logging.error(msg)
+                    sys.exit(-1)
+                
                 readymixingbowls = souschef.mixingbowls                
                 self.mixingbowls[0].extend(readymixingbowls[0])
             
@@ -512,6 +521,7 @@ class Chef:
             It works by doing [begin:end:step].
             By leaving begin and end off and specifying a step of -1,
              it reverses a string.
+            (Starts at the very beginning, ends at the very end, but steps "backwards".)
             https://stackoverflow.com/questions/931092/reverse-a-string-in-python
         """
         ## TODO -- one or other of the standard recipes is incorrectly reversed.
