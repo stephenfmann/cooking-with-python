@@ -25,14 +25,14 @@ Or run the script from shell with argument \<filename\> which contains the Chef 
 ## Examples
 Several examples can be found in the `recipes/` directory, including:
 
-### helloworld.txt
+### helloworld.chef
 *from [David Morgan-Mar](http://www.dangermouse.net/esoteric/chef_hello.html) ([archived link](http://web.archive.org/web/20220628204017/https://www.dangermouse.net/esoteric/chef_hello.html))*\
 This recipe prints the immortal words "Hello world!", in a basically brute force way. It also makes a lot of food for one person.
 
-### fibonacci.txt
+### fibonacci.chef
 *from [David Morgan-Mar](https://www.dangermouse.net/esoteric/chef_fib.html) ([archived link](http://web.archive.org/web/20220530112835/https://www.dangermouse.net/esoteric/chef_fib.html))*\
 This recipe prints the first 100 Fibonacci numbers. It uses an auxiliary recipe for caramel sauce to define Fibonacci numbers recursively. This results in an awful lot of caramel sauce! Definitely one for the sweet-tooths.
 
-### cherrypi.txt
+### cherrypi.chef
 *from me!*\
 Calculates the value of pie to an arbitrarily delicious degree of accuracy. You start with 1, 2 or 3 cherries; the more you add, the more deliciously accurate the pie will be. For every four cherries you use, your pie will gain about three more delicious decimal digits - that is, it will be approximately one thousand times more delicious.
