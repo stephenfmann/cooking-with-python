@@ -4,7 +4,13 @@
     See https://www.dangermouse.net/esoteric/chef.html for details.
 """
 
-import sys, re, random, copy
+import sys, re, random, copy, logging
+
+
+## Configure logging
+logger = logging.getLogger("Chef")
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+
 
 class Chef:
     """
@@ -17,6 +23,7 @@ class Chef:
         self.origscript     = script
         self.mixingbowls    = copy.deepcopy(mixingbowls)
         self.bakingdishes   = {}
+        
     
     def syntax_error(self,message):
         """
@@ -24,7 +31,7 @@ class Chef:
         """
         
         ## TODO: report line number.
-        print(f"Syntax error: {message}")
+        logger.error(f"Syntax error: {message}")
         sys.exit(-1)
         
     def cooking_error(self,message):
@@ -33,7 +40,7 @@ class Chef:
         """
         
         ## TODO - report line number
-        print(f"Cooking time error: {message}")
+        logger.error(f"Cooking time error: {message}")
         sys.exit()
     
     def parse(self):
@@ -45,7 +52,7 @@ class Chef:
         self.recipename = re.match("(.*?)\.\n\n", self.script)
         self.script = re.sub(self.recipename.group(), "", self.script)
         if(self.recipename == None):
-            print("Invalid recipe name")
+            logger.error("Invalid recipe name")
             sys.exit(-1)
         
         ## 2. Match a recipe name, first line of script, must end with a dot and two newlines.
@@ -61,7 +68,7 @@ class Chef:
         self.ingr = re.match("Ingredients\.\n", self.script)
         
         if self.ingr == None:
-            print("Ingredient list not found")
+            logger.error("Ingredient list not found")
             sys.exit(-1)
             
         ## Again, replace with nothing.
@@ -345,9 +352,9 @@ class Chef:
                     else:
                         existslater = re.match(clean.group(1) + " mixing bowl", text)
                         if existslater == None:
-                            print("Warning: Unknown mixing bowl"+str(clean.group(1)))
+                            logger.warning("Warning: Unknown mixing bowl"+str(clean.group(1)))
                         else:
-                            print("Warning: Tried to clean mixing bowl"+str(clean.group(1))+"before putting anything in it!")
+                            logger.warning("Warning: Tried to clean mixing bowl"+str(clean.group(1))+"before putting anything in it!")
                 continue
             
             ## J. Mix mixing bowl
@@ -361,9 +368,9 @@ class Chef:
                     else:
                         existslater = re.match(clean.mix(1) + " mixing bowl", text)
                         if existslater == None:
-                            print("Warning: Unknown mixing bowl"+mix.group(1))
+                            logger.warning("Warning: Unknown mixing bowl"+mix.group(1))
                         else:
-                            print("Warning: Tried to mix mixing bowl"+str(mix.group(1))+"before putting anything in it!")
+                            logger.warning("Warning: Tried to mix mixing bowl"+str(mix.group(1))+"before putting anything in it!")
                 continue
             
             ## K. Take from fridge
@@ -417,7 +424,7 @@ class Chef:
             if auxiliary != None:                                
                 auxtext = re.search(auxiliary.group(1) + "\.\n\n(.*)", self.origscript, re.IGNORECASE|re.DOTALL)
                 if not auxtext: # error!
-                    print("A sub-recipe was listed but could not be found. Try hiring a new sous-chef?")
+                    logger.error("A sub-recipe was listed but could not be found. Try hiring a new sous-chef?")
                     raise IOError
                 souschef = Chef(auxtext.group(), copy.copy(self.mixingbowls))
                 souschef.parse()
@@ -458,7 +465,7 @@ class Chef:
                     looptext = re.search(re_text, text, re.DOTALL|re.IGNORECASE)
                     
                     if not looptext:
-                        print(f'Verb unmatched. Could not find "{re_text}" in "{text}"')
+                        logger.error(f'Verb unmatched. Could not find "{re_text}" in "{text}"')
                         raise IOError
                     
                     deltext =  re.split("\.\s+", looptext.group(1))
@@ -514,8 +521,9 @@ if __name__ == "__main__":
     try:
         f = open(sys.argv[1], "r")
         main = Chef(f.read())
-        print(main.parse())
-    except(IOError):
-        pass # Should have been reported already
+        logger.info(main.parse())
+    except IOError as e:
+        logger.error(f'Fatal error: {str(e)}')
+        
     except(IndexError):
         pass # Should have been reported already
