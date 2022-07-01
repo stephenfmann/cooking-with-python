@@ -6,10 +6,10 @@
 A Python interpreter for the esolang Chef.
 
 ### What is Chef?
-Not the configuration management tool (boring) but the [esoteric programming language](http://www.dangermouse.net/esoteric/chef.html) (wow!)
+Not the configuration management tool (boring) but the [esoteric programming language](http://www.dangermouse.net/esoteric/chef.html) ([archived link](https://web.archive.org/web/20220615003505/http://www.dangermouse.net/esoteric/chef.html)) (wow!)
 
 ### What is Python?
-A less esoteric programming language. I'm using version 3.7.3.
+A less esoteric programming language. I'm using version 3.7+.
 
 ### Did you do this all yourself?
 No, I adapted it from a [mysterious unknown author](http://web.archive.org/web/20070814100416/http://rename.noll8.nu/sp3tt/chef.py).
@@ -23,14 +23,14 @@ No, I adapted it from a [mysterious unknown author](http://web.archive.org/web/2
 Or run the script from shell with argument \<filename\> which contains the Chef script.
 
 ## Examples
-Check out these example files:
+Several examples can be found in the `recipes/` directory, including:
 
 ### helloworld.txt
-*from [David Morgan-Mar](http://www.dangermouse.net/esoteric/chef_hello.html)*\
+*from [David Morgan-Mar](http://www.dangermouse.net/esoteric/chef_hello.html) ([archived link](http://web.archive.org/web/20220628204017/https://www.dangermouse.net/esoteric/chef_hello.html))*\
 This recipe prints the immortal words "Hello world!", in a basically brute force way. It also makes a lot of food for one person.
 
 ### fibonacci.txt
-*from [David Morgan-Mar](https://www.dangermouse.net/esoteric/chef_fib.html)*\
+*from [David Morgan-Mar](https://www.dangermouse.net/esoteric/chef_fib.html) ([archived link](http://web.archive.org/web/20220530112835/https://www.dangermouse.net/esoteric/chef_fib.html))*\
 This recipe prints the first 100 Fibonacci numbers. It uses an auxiliary recipe for caramel sauce to define Fibonacci numbers recursively. This results in an awful lot of caramel sauce! Definitely one for the sweet-tooths.
 
 ### cherrypi.txt
