@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
     chefint.py
     Interpret programs written in the esolang Chef.
@@ -240,9 +241,13 @@ class Chef:
         
         self.mixingbowls[key][-1][0] = float(self.mixingbowls[key][-1][0]/value)
         
-    def stir(self,mixingbowl,minutes,ingredient):
+    def stir(self,
+             mixingbowl = 0,
+             minutes    = None,
+             ingredient = None
+             )->None:
         """
-            This rolls the top <minutes> ingredients in the mixing bowl, 
+            This rolls the top <minutes> or <ingredient value> ingredients in the mixing bowl, 
              such that the top ingredient goes down that number of ingredients 
              and all ingredients above it rise one place. 
             If there are not that many ingredients in the bowl, 
@@ -250,20 +255,47 @@ class Chef:
              and all the others rise one place.
         """
         
+        ## Default is "Stir [the [nth] mixing bowl] for <minutes> minutes."
         value = int(minutes)
+        
+        ## Alternative is "Stir <ingredient> into the [nth] mixing bowl."
+        ## Default to this if <ingredient> is supplied.
         if ingredient:
             value = int(self.ingredientlist[ingredient][0])
         
+        ## Default to the zeroth mixing bowl
         key = 0
         if mixingbowl:
-            key = mixingbowl[:-2]
+            
+            ## The string like '3rd' was supplied.
+            ## Get the integer by chopping off the last two characters.
+            key = int(mixingbowl[:-2])
+            
+        else:
+            ## If no mixing bowl was named, there must only be one mixing bowl in the recipe.
+            assert len(self.mixingbowls) == 1
         
-        if self.mixingbowls[key]:
-            ## TODO -- check this is removing the correct item (the "top" one).
-            ing = self.mixingbowls[key].pop()    # Removes LAST item - push and pop are reversed in Python.
-            self.mixingbowls[key].reverse()
-            self.mixingbowls[key].insert(value,ing)
-            self.mixingbowls[key].reverse()
+        if key not in self.mixingbowls:
+            self.syntax_error(f"Mixing bowl {str(key)} not found.")
+            
+        ## We treat the "top" item in the mixing bowl as the last item in the list.
+        ## That's because push and pop operate on last items rather than first.
+        ## E.g. suppose we are rolling a mixing bowl with ingredient values (top to bottom):
+        ##      1 2 3 4
+        ## Then the list has entries
+        ##      [4, 3, 2, 1]
+        ## And suppose <value> is 2.
+        ## Then the end result should be:
+        ##      2 3 1 4
+        ## Represented by the list
+        ##      [4, 1, 3, 2]
+        
+        ## Remove the top ingredient
+        ing = self.mixingbowls[key].pop() # e.g. [4, 3, 2]
+        
+        ## Insert the top ingredient at place <value>
+        ## Location is <value> from the *end*, so multiply <value> by -1.
+        self.mixingbowls[key].insert(-1*value,ing)
             
     def execute(self, text, loop=False):
         """
