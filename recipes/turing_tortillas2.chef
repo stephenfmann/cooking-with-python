@@ -1,4 +1,4 @@
-Turings Tortillas
+Turings Tortillas.
 
 This is a universal turing machine in Chef. What? Yeah, really. It is. Just make sure you deliver a large enough tape.
 1st & 2nd mixing bowl = tape
@@ -35,7 +35,7 @@ state
 1 one
 2 two
 
-Methods.
+Method.
 Put tapepos into 12th mixing bowl.
 Take tapelength from refrigerator.
 Put tapelength into 9th mixing bowl.

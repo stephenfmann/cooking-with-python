@@ -529,11 +529,14 @@ class Chef:
 
 if __name__ == "__main__":
     try:
-        f = open(sys.argv[1], "r")
-        main = Chef(f.read())
-        logger.info(main.parse())
+        
+        with open(sys.argv[1], "r",encoding='utf-8') as f:
+            main = Chef(f.read())
+            logger.info(main.parse())
+            
     except IOError as e:
         logger.error(f'Fatal error: {str(e)}')
         
-    except(IndexError):
-        pass # Should have been reported already
+        
+    except IndexError as e:
+        logger.error(f'Fatal error: {str(e)}')

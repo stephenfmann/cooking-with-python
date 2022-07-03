@@ -1,4 +1,4 @@
-Bubbled and Baked Bacon
+Bubbled and Baked Bacon.
 
 A tasty bacon recipe, leaving it all baked and bubbled with a little decorative flag skewer on top.
 All arranged in the right order, of course. It's a pity for whoever gets to do the dishes, though; the recipe uses 4 bowls, one of which exclusively for a little wooden flag. [By joostrijneveld https://github.com/joostrijneveld/Chef-Interpreter/blob/master/ChefInterpreter/BubbledAndBakedBacon.chef]
@@ -8,7 +8,7 @@ Ingredients.
 375 g bacon
 1 flag skewer
 
-Methods.
+Method.
 Take slices from refrigerator.
 Put slices into 3rd mixing bowl.
 Store the slices.
@@ -45,7 +45,7 @@ Pour contents of the mixing bowl into the baking dish.
 
 Serves 1.
 
-Greater gravy
+Greater gravy.
 
 If the top-most ingredient in the mixing bowl is bigger than the one below it, this adds 1 ml of gravy to the mixing bowl. Otherwise, 0 ml of gravy is added.
 
@@ -56,7 +56,7 @@ Ingredients.
 0 pinches salt
 2 tablespoons corn starch
 
-Methods.
+Method.
 Fold cream into mixing bowl.
 Fold water into mixing bowl.
 Put cream into mixing bowl.
