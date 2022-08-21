@@ -116,8 +116,7 @@ class Chef:
         ## 8. Find output directive.
         serves = re.search("Serves ([0-9]+).", self.script)
         if serves != None:
-            output = self.serve(int(serves.group(1))) # Call function to return output
-            return output
+            self.serve(int(serves.group(1)))
         
     def ambigcheck(self, text, dish=False):
         """
@@ -584,27 +583,25 @@ class Chef:
             The Serves statement is optional, but is required if the recipe is to output anything!
         """
         
-        output = ""
         if number > len(self.bakingdishes):
             number = len(self.bakingdishes)
         for i in range(DEFAULT_BOWL, number+DEFAULT_BOWL):
             if self.bakingdishes[i]:
-                for j in self.bakingdishes[i]:
+                
+                """
+                    This is extended slice syntax.
+                    It works by doing [begin:end:step].
+                    By leaving begin and end off and specifying a step of -1,
+                     it reverses a string.
+                    (Starts at the very beginning, ends at the very end, but steps "backwards".)
+                    https://stackoverflow.com/questions/931092/reverse-a-string-in-python
+                """
+                for j in self.bakingdishes[i][::-1]:
                     value = j[0]
                     if j[1] == "liquid":
                         value = chr(value)
-                    output += str(value)
-        
-        """
-            This is extended slice syntax.
-            It works by doing [begin:end:step].
-            By leaving begin and end off and specifying a step of -1,
-             it reverses a string.
-            (Starts at the very beginning, ends at the very end, but steps "backwards".)
-            https://stackoverflow.com/questions/931092/reverse-a-string-in-python
-        """
-        ## TODO -- one or other of the standard recipes is incorrectly reversed.
-        return output[::-1] ## SFM: the loop outputs backwards, so reverse here
+                    print(value) ## Outputs to STDOUT by default
+                    
 
 if __name__ == "__main__":
     try:
