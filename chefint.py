@@ -7,6 +7,8 @@
 
 import sys, re, random, copy, logging
 
+## Global constants
+DEFAULT_BOWL = 1 # the default mixing bowl number (also applies to baking dishes)
 
 ## Configure logging
 logger = logging.getLogger("Chef")
@@ -19,7 +21,7 @@ class Chef:
         Calls instances of itself to parse sub-recipes.
     """
     
-    def __init__(self, script, mixingbowls = {0: []}):
+    def __init__(self, script, mixingbowls = {DEFAULT_BOWL: []}):
         self.script         = script
         self.origscript     = script
         self.mixingbowls    = copy.deepcopy(mixingbowls)
@@ -146,15 +148,14 @@ class Chef:
         
         if mixingbowl == None:
             if len(self.mixingbowls) > 0:
-                self.mixingbowls[0].append(value)
+                self.mixingbowls[DEFAULT_BOWL].append(value)
                 return
-            self.mixingbowls[0] = []                        
-            self.mixingbowls[0].append(value)
+            self.mixingbowls[DEFAULT_BOWL] = []                        
+            self.mixingbowls[DEFAULT_BOWL].append(value)
             return
         
-        ## Mixing bowl exists 
-        ## Numbered mixing bowls use their number -1 as index.
-        key = int(mixingbowl)-1            
+        ## Mixing bowl exists.
+        key = int(mixingbowl)
         if not key in self.mixingbowls:
             self.mixingbowls[key] = []     
             
@@ -166,9 +167,9 @@ class Chef:
             Opposite of put.
         """
         
-        key = 0
+        key = DEFAULT_BOWL
         if mixingbowl:
-            key = int(mixingbowl[:-2])-1
+            key = int(mixingbowl[:-2])
         
         ## TODO - fix this (ingredient name and dry/liquid should not be overwritten)
         self.ingredientlist[ingredient] = self.mixingbowls[key].pop()
@@ -181,9 +182,9 @@ class Chef:
         
         value = self.ingredientlist[ingredient][0]
         
-        key = 0
+        key = DEFAULT_BOWL
         if mixingbowl:
-            key = int(mixingbowl[:-2])-1
+            key = int(mixingbowl[:-2])
             
         if value == None:
             value = 0
@@ -198,7 +199,7 @@ class Chef:
         
         value = self.ingredientlist[ingredient][0]
         
-        key = 0
+        key = DEFAULT_BOWL
         if mixingbowl:
             key = mixingbowl[:-2]
             
@@ -215,7 +216,7 @@ class Chef:
         
         value = self.ingredientlist[ingredient][0]
         
-        key = 0
+        key = DEFAULT_BOWL
         if mixingbowl:
             key = mixingbowl[:-2]
             
@@ -226,7 +227,7 @@ class Chef:
         
     def divideingredient(self, 
                          ingredient, 
-                         mixingbowl
+                         mixingbowl = DEFAULT_BOWL
                          )->None:
         """
         Divide the value of the ingredient on top of mixing bowl <mixingbowl>
@@ -248,7 +249,7 @@ class Chef:
         value = self.ingredientlist[ingredient][0]
         
         ## Get the mixing bowl number.
-        key = 0
+        key = DEFAULT_BOWL
         if mixingbowl:
             key = mixingbowl[:-2] ## Get the integer (as string) from the ordinal numeral.
         
@@ -263,7 +264,7 @@ class Chef:
         self.mixingbowls[key][-1][0] = float(self.mixingbowls[key][-1][0]/value)
         
     def stir(self,
-             mixingbowl = 0,
+             mixingbowl = DEFAULT_BOWL,
              minutes    = None,
              ingredient = None
              )->None:
@@ -285,7 +286,7 @@ class Chef:
             value = int(self.ingredientlist[ingredient][0])
         
         ## Default to the zeroth mixing bowl
-        key = 0
+        key = DEFAULT_BOWL
         if mixingbowl:
             
             ## The string like '3rd' was supplied.
@@ -298,6 +299,9 @@ class Chef:
         
         if key not in self.mixingbowls:
             self.syntax_error(f"Mixing bowl {str(key)} not found.")
+        
+        ## If the mixing bowl is empty, nothing happens.
+        if not self.mixingbowls[key]: return
             
         ## We treat the "top" item in the mixing bowl as the last item in the list.
         ## That's because push and pop operate on last items rather than first.
@@ -383,7 +387,7 @@ class Chef:
             if liquefy != None:                
                 if liquefy.group(1) == None:                    
                     self.ambigcheck(text)                
-                    for i in self.mixingbowls[0]:                    
+                    for i in self.mixingbowls[DEFAULT_BOWL]:                    
                         if(i[1] == "dry"):
                             i[1] = "liquid"                            
                 continue
@@ -398,7 +402,7 @@ class Chef:
             clean = re.search("Clean the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl", ex)
             if clean != None:
                 if clean.group(1) == None:
-                        self.mixingbowls[0] = []
+                        self.mixingbowls[DEFAULT_BOWL] = []
                 else:
                     if clean.group(1)[:-2] in self.mixingbowls:
                         self.mixingbowls[clean.group(1)[:-2]] = []
@@ -414,7 +418,7 @@ class Chef:
             mix = re.search("Mix the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl well", ex)
             if mix != None:
                 if mix.group(1) == None:
-                        random.shuffle(self.mixingbowls[0])
+                        random.shuffle(self.mixingbowls[DEFAULT_BOWL])
                 else:
                     if mix.group(1)[:-2] in self.mixingbowls:
                         random.shuffle(self.mixingbowls[clean.mix(1)[:-2]])
@@ -441,13 +445,13 @@ class Chef:
             pour = re.search("Pour contents of the (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?mixing bowl into the (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?baking dish", ex)            
             if pour != None:                
                 if pour.group(1) == None:
-                    key = 0
+                    key = DEFAULT_BOWL
                 else:
-                    key = int(pour.group(1))-1
+                    key = int(pour.group(1))
                 if pour.group(2) == None:                    
-                    key2 = 0
+                    key2 = DEFAULT_BOWL
                 else:
-                    key2 = int(pour.group(2))-1                
+                    key2 = int(pour.group(2))
                 self.ambigcheck(text, True)
                 if not key2 in self.bakingdishes:                    
                     self.bakingdishes[key2] = []
@@ -491,7 +495,7 @@ class Chef:
                     sys.exit(-1)
                 
                 readymixingbowls = souschef.mixingbowls                
-                self.mixingbowls[0].extend(readymixingbowls[0])
+                self.mixingbowls[DEFAULT_BOWL].extend(readymixingbowls[DEFAULT_BOWL])
             
             ## P. Stir
             stir = re.match("Stir(?: the (1st|2nd|3rd|[0-9]+th) mixing bowl)? for ([1-9]+) minutes?", ex)
@@ -561,7 +565,7 @@ class Chef:
         output = ""
         if number > len(self.bakingdishes):
             number = len(self.bakingdishes)
-        for i in range(0, number):
+        for i in range(DEFAULT_BOWL, number+DEFAULT_BOWL):
             if self.bakingdishes[i]:
                 for j in self.bakingdishes[i]:
                     value = j[0]
