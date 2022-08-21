@@ -224,21 +224,42 @@ class Chef:
         
         self.mixingbowls[key][-1][0] *= value
         
-    def divideingredient(self, ingredient, mixingbowl):
+    def divideingredient(self, 
+                         ingredient, 
+                         mixingbowl
+                         )->None:
         """
-            Divide the value of the ingredient on top of the mixing bowl 
-            by the value of <ingredient> and store the result in the mixing bowl.
+        Divide the value of the ingredient on top of mixing bowl <mixingbowl>
+         by the value of <ingredient> and store the result in the mixing bowl.
+
+        Parameters
+        ----------
+        ingredient : str
+            Name of the ingredient whose value is the divisor.
+        mixingbowl : str
+            Ordinal numeral e.g. 1st, 2nd, 3rd etc
+             indicating the mixing bowl whose top value
+             is to be divided by the value of <ingredient>.
+            To get just the number (as str), use <mixingbowl[:-2]>.
+
         """
         
+        ## Get the divisor: the value of <ingredient>.
         value = self.ingredientlist[ingredient][0]
         
+        ## Get the mixing bowl number.
         key = 0
         if mixingbowl:
-            key = mixingbowl[:-2]
+            key = mixingbowl[:-2] ## Get the integer (as string) from the ordinal numeral.
         
+        ## Ingredients with no value are assumed to leave the mixing bowl unchanged.
         if value == None:
             value = 1
         
+        ## Divide the top value of the mixing bowl by the ingredient value.
+        ##  <key> is the bowl
+        ##  <-1> indicates the top ingredient, which is a list with entries [value, wet/dry, name]
+        ##  <0> is the first entry in that list, i.e. the ingredient's value.
         self.mixingbowls[key][-1][0] = float(self.mixingbowls[key][-1][0]/value)
         
     def stir(self,
