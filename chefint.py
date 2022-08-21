@@ -162,17 +162,39 @@ class Chef:
         self.mixingbowls[key].append(value)
             
         
-    def fold(self, ingredient, mixingbowl):
+    def fold(self, 
+             ingredient, 
+             mixingbowl
+             )->None:
         """
-            Opposite of put.
+        Opposite of put().
+        
+        This removes the top value from the <mixingbowl>th mixing bowl 
+         and uses it as the new value of <ingredient>.
+        
+        The name and dry/wet status of <ingredient> should not change.
+
+        Parameters
+        ----------
+        ingredient : str
+            Name of ingredient whose value will be replaced.
+        mixingbowl : str
+            Ordinal numeral name of mixing bowl whose top ingredient's value
+             will replace the value of <ingredient>.
+
         """
         
+        ## Determine which mixing bowl to use.
         key = DEFAULT_BOWL
         if mixingbowl:
             key = int(mixingbowl[:-2])
         
-        ## TODO - fix this (ingredient name and dry/liquid should not be overwritten)
-        self.ingredientlist[ingredient] = self.mixingbowls[key].pop()
+        ## Get the ingredient out of the bowl
+        full_ingredient = self.mixingbowls[key].pop()
+        
+        ## Put the removed ingredient's value onto the named ingredient.
+        self.ingredientlist[ingredient][0] = full_ingredient[0]
+        
         
     def addingredient(self, ingredient, mixingbowl):
         """
@@ -348,7 +370,7 @@ class Chef:
                 self.put(put.group(2), copy.copy(self.ingredientlist[put.group(1)]))
             
             ## B. Fold
-            fold = re.search("Fold ([a-zA-Z ]+) into (?:the )?(1st|2nd|3rd|[0-9]+th)? ?mixing bowl", ex)
+            fold = re.search("Fold (?:the )?([a-zA-Z ]+) into (?:the )?(1st|2nd|3rd|[0-9]+th)? ?mixing bowl", ex)
             if fold != None:
                 if fold.group(2) == None:
                     self.ambigcheck(text)                
