@@ -12,19 +12,38 @@ DEFAULT_BOWL = 1 # the default mixing bowl number (also applies to baking dishes
 
 ## Configure logging
 logger = logging.getLogger("Chef")
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+
+## Log anything of priority INFO and higher
+logging.basicConfig(level=logging.INFO, 
+## How the log message is formatted.
+## See https://docs.python.org/3/library/logging.html#formatter-objects
+                    format='%(message)s' # get the message as a string(?)
+                    )
 
 
 class Chef:
     """
         Parse a recipe.
-        Calls instances of itself to parse sub-recipes.
+        Calls instances of itself to parse auxiliary recipes.
     """
     
     def __init__(self, script, mixingbowls = {DEFAULT_BOWL: []}):
-        self.script         = script
-        self.origscript     = script
+        
+        ## Initialise and set object properties
+        ## The script of this recipe.
+        self._script         = script
+        
+        ## Keep an original copy of the script, because self.script
+        ##  will be slowly modified as we work through each section.
+        ## TODO we will be changing this so that self.script stays the same.
+        # self.origscript     = script
+        
+        ## If this is an auxiliary recipe, we inherit mixing bowls from the
+        ##  calling recipe.
+        ## We make a copy so as not to modify the original mixing bowls.
         self.mixingbowls    = copy.deepcopy(mixingbowls)
+        
+        ## Initialise empty baking dishes.
         self.bakingdishes   = {}
         
     
@@ -52,7 +71,13 @@ class Chef:
         """
         
         ## 1. Find recipe name
-        self.recipename = re.match("(.*?)\.\n\n", self.script)
+        
+        self.recipename = re.match(
+            ## (.*?): Create a group () that matches any text or whitespace except  \n
+            "(.*?)\.\n\n",
+            self.script)
+        
+        
         self.script = re.sub(self.recipename.group(), "", self.script)
         if(self.recipename == None):
             logger.error("Invalid recipe name")
@@ -601,7 +626,200 @@ class Chef:
                     if j[1] == "liquid":
                         value = chr(value)
                     print(value) ## Outputs to STDOUT by default
-                    
+    
+    """
+        Aliases: Lazy instantiation of class properties.
+        Define a bunch of public property names that are actually wrappers to class methods.
+        The class method figures out whether the corresponding private property exists yet.
+        If the property already exists, the method returns it.
+        If it doesn't, the method creates the property and returns it.
+    """
+    @property
+    def script(self): return self._script
+    
+    @property
+    def recipename(self):
+        """
+        Lazy instantiation of the recipe name.
+
+        Returns
+        -------
+        _recipename: string
+            The name of the current recipe.
+
+        """
+        
+        if hasattr(self,"_recipename"): return self._recipename
+            
+        ## We have not yet determined the recipe name. Do it now.
+        
+        ## Use regular expression to find the recipe name within the self.script string.
+        ## re.match() tries to find just the first instance of a pattern.
+        match_recipename = re.match(
+            ## (.*): Create a group, (), that matches any text or whitespace, ., except \n multiple times, *
+            ## \.: match the full stop character . exactly
+            ## \n\n: match two newline characters exactly
+            "(.*)\.\n\n",
+            self.script)
+        
+        ## We expect exactly one result.
+        if match_recipename == None or len(match_recipename.groups()) > 1:
+            logger.error("Invalid recipe name")
+            sys.exit(-1)
+        
+        ## group(1) will return the 1st capture (stuff within the brackets).
+        ## group(0) will returned the entire matched text i.e. with the \n\n included.
+        ## We don't want the newlines included, so we just get group(1).
+        self._recipename = match_recipename.group(1)
+        
+        return self._recipename
+    
+    @property
+    def comment(self):
+        """
+        Lazy instantiation of the recipe comment.
+
+        Returns
+        -------
+        comment: string
+            Comment describing the recipe.
+            Note that the comment is optional.
+            If it doesn't exist, this method returns None.
+        """
+        
+        ## Have we already determined the comment?
+        if hasattr(self,'_comment'): return self._comment
+        
+        ## We have not yet figured out what the comment is, or if it even exists.
+        
+        ## First, get a copy of the script with the recipe name, first full stop and newlines removed.
+        script_without_recipename = re.sub(self.recipename+"\.\n\n", "", self.script)
+        
+        ## Now get the first thing that matches a paragraph.
+        match_comment = re.match(
+            ## Match everything except newlines, followed by two newlines and the word "Ingredients."
+            "(.*)\n\nIngredients\.", 
+            script_without_recipename,
+            )
+        
+        ## Is there a comment?
+        if match_comment is None:
+            ## There is no comment.
+            ## Set self._comment to None and return it.
+            self._comment = None
+            return self._comment
+        
+        ## There is a comment.
+        self._comment = match_comment.group(1)
+        
+        return self._comment
+    
+    @property
+    def ingredients(self)->dict:
+        """
+        Lazy instantiation of the recipe ingredients.
+
+        Returns
+        -------
+        _ingredients: dict
+            Dictionary of ingredients.
+            Key is the name of the thing e.g. beans, water, sugar
+            Value is a 3-element list [Quantity, Type, Name]
+                Quantity is an integer
+                Type is a string: dry or liquid
+                Name is a string: same as the key (it's useful to have it in the list too)
+            
+        """
+        
+        if hasattr(self,"_ingredients"): return self._ingredients
+        
+        ## Get a copy of the script without the title or comment
+        ## First remove the title
+        script_up_to_ingredients = re.sub(self.recipename+"\.\n\n", "", self.script)
+        
+        ## Now remove the comment, if there is one
+        if self.comment is not None:
+            script_up_to_ingredients = script_up_to_ingredients.replace(self.comment+"\n\n", "")
+        
+        ## Now the beginning of script_up_to_ingredients is "Ingredients.\n"
+        ingredients_header = re.match("Ingredients\.\n", script_up_to_ingredients)
+        
+        if ingredients_header is None:
+            logger.error("Ingredient list not found")
+            sys.exit(-1)
+            
+        ## Again, replace with nothing.
+        script_up_to_ingredients = script_up_to_ingredients.replace("Ingredients.\n","")
+        
+        ## Match all of the individual ingredients.
+        ingredients_match = re.findall(
+            ## (([0-9]*): There may or may not be an integer
+            ##  ?: There may or may not be a single whitespace
+            ## (k?g|pinch(?:es)?|m?l|dash(?:es)?|cups?|teaspoons?|tablespoons?)?: 
+                ## There may or may not be a unit of measure
+            ##  ?: There may or may not be a(nother) single whitespace
+            ## ([a-zA-Z0-9 ]+): There needs to be an ingredinent name, which can contain whitespaces and numbers
+            "(([0-9]*) ?(k?g|pinch(?:es)?|m?l|dash(?:es)?|cups?|teaspoons?|tablespoons?)? ?([a-zA-Z0-9 ]+)\n)", 
+            script_up_to_ingredients)
+        
+        self._ingredients = {}
+        
+        ## Now step through each match, delete it from the recipe and add it to the dictionary
+        for ingredient in ingredients_match:
+            
+            ## Check the thing matched really is in the string
+            ## (I don't know how it couldn't be, but I'm leaving this check here just in case.)
+            if re.match(ingredient[0], script_up_to_ingredients) is not None:
+                
+                ## Delete this ingredient from the recipe string
+                script_up_to_ingredients = script_up_to_ingredients.replace(ingredient[0], "")
+            
+            ## Dry or liquid? Check the unit of measure.
+            ##  Note that chr() is not run on values until output.
+            ##   This is to allow arithmetic operations on liquids.
+            ## There is a pre-defined set of liquid types.
+            if ingredient[2] in ["dash", "cup", "l", "ml", "dashes", "cups"]:
+                
+                ## The quantity is an integer
+                quantity = int(ingredient[1])
+                ingredient_type = "liquid"
+                
+            else:
+                ## It's a dry ingredient, and it might have a quantity
+                ingredient_type = "dry"
+                
+                try:
+                    quantity = int(ingredient[1])
+                except ValueError:
+                    ## There's no number there, so the quantity is None.
+                    ## This means the user will be prompted to input the quantity at runtime.
+                    quantity = None
+            
+            ## Add the dictionary entry.
+            self._ingredients[ingredient[3]] = [quantity, ingredient_type, ingredient[3]]
+        
+        return self._ingredients
+    
+def load(fpath):
+    """
+    Load a recipe into a Chef object and return the object without parsing.
+
+    Parameters
+    ----------
+    fpath : string
+        Filepath of the Chef recipe.
+
+    Returns
+    -------
+    chef : Chef()
+        Chef object with the specified recipe loaded.
+
+    """
+    
+    with open(fpath, "r",encoding='utf-8') as f:
+        chef = Chef(f.read())
+    
+    return chef
 
 if __name__ == "__main__":
     try:
