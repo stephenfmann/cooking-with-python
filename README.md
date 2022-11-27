@@ -14,6 +14,8 @@ A less esoteric programming language. I'm using version 3.7+.
 ### Did you do this all yourself?
 No, I adapted it from a [mysterious unknown author](http://web.archive.org/web/20070814100416/http://rename.noll8.nu/sp3tt/chef.py).
 
+Also check out [Dorlsch0's Python interpreter](https://github.com/DorIsch0/Pi-e) and [joostrijneveld's Java interpreter](https://github.com/joostrijneveld/Chef-Interpreter).
+
 ## Run
 
 `import chefint`\
