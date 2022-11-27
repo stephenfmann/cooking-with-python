@@ -72,71 +72,71 @@ class Chef:
         
         ## 1. Find recipe name
         
-        self.recipename = re.match(
-            ## (.*?): Create a group () that matches any text or whitespace except  \n
-            "(.*?)\.\n\n",
-            self.script)
+        # self.recipename = re.match(
+        #     ## (.*?): Create a group () that matches any text or whitespace except  \n
+        #     "(.*?)\.\n\n",
+        #     self.script)
         
         
-        self.script = re.sub(self.recipename.group(), "", self.script)
-        if(self.recipename == None):
-            logger.error("Invalid recipe name")
-            sys.exit(-1)
+        # self.script = re.sub(self.recipename.group(), "", self.script)
+        # if(self.recipename == None):
+        #     logger.error("Invalid recipe name")
+        #     sys.exit(-1)
         
-        ## 2. Match a recipe name, first line of script, must end with a dot and two newlines.
-        ## Replace this with nothing to allow for further matching.
-        self.comment = re.match("(.*?)\n\n", self.script, re.DOTALL)
+        # ## 2. Match a recipe name, first line of script, must end with a dot and two newlines.
+        # ## Replace this with nothing to allow for further matching.
+        # self.comment = re.match("(.*?)\n\n", self.script, re.DOTALL)
         
-        ## 3. Find a comment, and replace it. 
-        if self.comment != None\
-        and re.match("^Ingredients", self.comment.group()) == None: # Make sure we do not replace the ingredient list.
-            self.script = re.sub(re.escape(self.comment.group()), "", self.script) # Replace the comment with nothing.
+        # ## 3. Find a comment, and replace it. 
+        # if self.comment != None\
+        # and re.match("^Ingredients", self.comment.group()) == None: # Make sure we do not replace the ingredient list.
+        #     self.script = re.sub(re.escape(self.comment.group()), "", self.script) # Replace the comment with nothing.
         
-        ## 4. Find ingredient list.
-        self.ingr = re.match("Ingredients\.\n", self.script)
+        # ## 4. Find ingredient list.
+        # self.ingr = re.match("Ingredients\.\n", self.script)
         
-        if self.ingr == None:
-            logger.error("Ingredient list not found")
-            sys.exit(-1)
+        # if self.ingr == None:
+        #     logger.error("Ingredient list not found")
+        #     sys.exit(-1)
             
-        ## Again, replace with nothing.
-        self.script = re.sub(self.ingr.group(), "", self.script, 1)
+        # ## Again, replace with nothing.
+        # self.script = re.sub(self.ingr.group(), "", self.script, 1)
         
-        ## 5. Match ingredients.
-        self.ingredients = re.findall("(([0-9]*) ?(k?g|pinch(?:es)?|m?l|dash(?:es)?|cups?|teaspoons?|tablespoons?)? ?([a-zA-Z0-9 ]+)\n)", self.script)
+        # ## 5. Match ingredients.
+        # self.ingredients = re.findall("(([0-9]*) ?(k?g|pinch(?:es)?|m?l|dash(?:es)?|cups?|teaspoons?|tablespoons?)? ?([a-zA-Z0-9 ]+)\n)", self.script)
         
-        self.ingredientlist = {}
+        # self.ingredientlist = {}
         
-        for i in self.ingredients:
-            if re.match(i[0], self.script) != None:
-                ## Replace them with nothing, but only if they are exactly at the beginning of the script
-                ##   to avoid replacing axuiliary ingredients.
-                self.script = self.script.replace(i[0], "")
+        # for i in self.ingredients:
+        #     if re.match(i[0], self.script) != None:
+        #         ## Replace them with nothing, but only if they are exactly at the beginning of the script
+        #         ##   to avoid replacing axuiliary ingredients.
+        #         self.script = self.script.replace(i[0], "")
                 
-            ## Type assignment is next. Note that chr() is not run on values until output.
-            ##   This is to allow arithmetic operations on liquids.
-            if(i[2] in("dash", "cup", "l", "ml", "dashes", "cups")):
-                value = int(i[1])
-                type = "liquid"
-            else:
-                try:
-                    value = int(i[1])
-                except ValueError:
-                    value = None
-                type = "dry"
-            self.ingredientlist[i[3]] = [value, type, i[3]]
+        #     ## Type assignment is next. Note that chr() is not run on values until output.
+        #     ##   This is to allow arithmetic operations on liquids.
+        #     if(i[2] in("dash", "cup", "l", "ml", "dashes", "cups")):
+        #         value = int(i[1])
+        #         type = "liquid"
+        #     else:
+        #         try:
+        #             value = int(i[1])
+        #         except ValueError:
+        #             value = None
+        #         type = "dry"
+        #     self.ingredientlist[i[3]] = [value, type, i[3]]
             
-        ## 6. Find the method. This is where things get interesting.
-        self.script = self.script.lstrip()
+        # ## 6. Find the method. This is where things get interesting.
+        # self.script = self.script.lstrip()
         
-        self.meth = re.match("(.+[\r\n]+)*?Method.\n", self.script)
+        # self.meth = re.match("(.+[\r\n]+)*?Method.\n", self.script)
         
-        ## Match anything up to two newlines.
-        self.script = re.sub(self.meth.group(), "", self.script, 1)
-        self.method = re.match("(.*?)\n\n", self.script, re.DOTALL)
+        # ## Match anything up to two newlines.
+        # self.script = re.sub(self.meth.group(), "", self.script, 1)
+        # self.method = re.match("(.*?)\n\n", self.script, re.DOTALL)
         
         ## 7. Run the script & Cook the food.
-        self.execute(self.method.group(1))
+        self.execute()
         
         ## 8. Find output directive.
         serves = re.search("Serves ([0-9]+).", self.script)
@@ -368,68 +368,68 @@ class Chef:
         ## Location is <value> from the *end*, so multiply <value> by -1.
         self.mixingbowls[key].insert(-1*value,ing)
             
-    def execute(self, text, loop=False):
+    def execute(self, loop=False):
         """
             Main interpreting function.
             Step through each line and run the appropriate function.
         """
         
         ## 1. Split lines
-        excode = re.split("\.\s+", text)
+        # excode = re.split("\.\s+", text)
         
-        def stripwhite(x):
-            return x.lstrip()
-        excode = list(map(stripwhite, excode))
-        excode[-1] = excode[-1][:-1] 
+        # def stripwhite(x):
+        #     return x.lstrip()
+        # excode = list(map(stripwhite, excode))
+        # excode[-1] = excode[-1][:-1] 
         
         ## 2. Step through lines.
         ## Do a series of regexps, call appropriate function.
-        for ex in excode:
+        for instruction in self.method:
             
             ## A. Put
-            put = re.search("^Put (?:the )?([a-zA-Z ]+) into (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?mixing bowl", ex)
+            put = re.search("^Put (?:the )?([a-zA-Z ]+) into (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?mixing bowl", instruction)
             if put != None:
                 if put.group(2) == None:                    
                     self.ambigcheck(text)
                 self.put(put.group(2), copy.copy(self.ingredientlist[put.group(1)]))
             
             ## B. Fold
-            fold = re.search("Fold (?:the )?([a-zA-Z ]+) into (?:the )?(1st|2nd|3rd|[0-9]+th)? ?mixing bowl", ex)
+            fold = re.search("Fold (?:the )?([a-zA-Z ]+) into (?:the )?(1st|2nd|3rd|[0-9]+th)? ?mixing bowl", instruction)
             if fold != None:
                 if fold.group(2) == None:
                     self.ambigcheck(text)                
                 self.fold(fold.group(1), fold.group(2))
             
             ## C. Add
-            add = re.search("Add ([a-zA-Z0-9 ]+?) to (?:the )?(?:(1st|2nd|3rd|[0-9]+th) )?mixing bowl", ex)
+            add = re.search("Add ([a-zA-Z0-9 ]+?) to (?:the )?(?:(1st|2nd|3rd|[0-9]+th) )?mixing bowl", instruction)
             if add != None:
                 if add.group(2) == None:
                     self.ambigcheck(text)
                 self.addingredient(add.group(1), add.group(2))
             
             ## D. Remove
-            remove = re.search("Remove ([a-zA-Z0-9 ]+?) from (?:the )?(?:(1st|2nd|3rd|[0-9]+th) )?mixing bowl", ex)
+            remove = re.search("Remove ([a-zA-Z0-9 ]+?) from (?:the )?(?:(1st|2nd|3rd|[0-9]+th) )?mixing bowl", instruction)
             if remove != None:
                 if remove.group(2) == None:
                     self.ambigcheck(text)
                 self.removeingredient(remove.group(1), remove.group(2))
                 
             ## E. Combine
-            combine = re.search("Combine ([a-zA-Z0-9 ]+?) into (?:the )?(?:(1st|2nd|3rd|[0-9]+th) )?mixing bowl", ex)
+            combine = re.search("Combine ([a-zA-Z0-9 ]+?) into (?:the )?(?:(1st|2nd|3rd|[0-9]+th) )?mixing bowl", instruction)
             if combine != None:
                 if combine.group(2) == None:
                     self.ambigcheck(text)
                 self.combineingredient(combine.group(1), combine.group(2))
             
             ## F. Divide
-            divide = re.search("Divide ([a-zA-Z0-9 ]+?) into (?:the )?(?:(1st|2nd|3rd|[0-9]+th) )?mixing bowl", ex)
+            divide = re.search("Divide ([a-zA-Z0-9 ]+?) into (?:the )?(?:(1st|2nd|3rd|[0-9]+th) )?mixing bowl", instruction)
             if divide != None:
                 if divide.group(2) == None:
                     self.ambigcheck(text)
                 self.divideingredient(divide.group(1), divide.group(2))
             
             ## G. Liquefy mixing bowl
-            liquefy = re.search("Liquefy contents of the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl", ex)
+            liquefy = re.search("Liquefy contents of the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl", instruction)
             if liquefy != None:                
                 if liquefy.group(1) == None:                    
                     self.ambigcheck(text)                
@@ -439,13 +439,13 @@ class Chef:
                 continue
             
             ## H. Liquefy ingredient
-            liquefy2 = re.search("Liquefy [a-zA-Z]", ex)
+            liquefy2 = re.search("Liquefy [a-zA-Z]", instruction)
             if liquefy2 != None: #
                 self.ingredientlist[liquefy2.group(1)] 
                 continue
             
             ## I. Clean mixing bowl
-            clean = re.search("Clean the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl", ex)
+            clean = re.search("Clean the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl", instruction)
             if clean != None:
                 if clean.group(1) == None:
                         self.mixingbowls[DEFAULT_BOWL] = []
@@ -461,7 +461,7 @@ class Chef:
                 continue
             
             ## J. Mix mixing bowl
-            mix = re.search("Mix the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl well", ex)
+            mix = re.search("Mix the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl well", instruction)
             if mix != None:
                 if mix.group(1) == None:
                         random.shuffle(self.mixingbowls[DEFAULT_BOWL])
@@ -477,7 +477,7 @@ class Chef:
                 continue
             
             ## K. Take from fridge
-            fridge = re.search("Take ([a-zA-Z ]+) from refrigerator", ex)
+            fridge = re.search("Take ([a-zA-Z ]+) from refrigerator", instruction)
             if fridge != None:
                 if fridge.group(1) in self.ingredientlist:
                     value = int(input(fridge.group(1) + ": ")) # sfm renamed raw_input to input 2->3
@@ -488,7 +488,7 @@ class Chef:
                 continue
             
             ## L. Pour
-            pour = re.search("Pour contents of the (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?mixing bowl into the (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?baking dish", ex)            
+            pour = re.search("Pour contents of the (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?mixing bowl into the (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?baking dish", instruction)            
             if pour != None:                
                 if pour.group(1) == None:
                     key = DEFAULT_BOWL
@@ -505,14 +505,14 @@ class Chef:
                 continue
             
             ## M. Refrigerate
-            refer = re.search("Refrigerate (?:for ([0-9]+))? hours", ex)
+            refer = re.search("Refrigerate (?:for ([0-9]+))? hours", instruction)
             if refer != None:
                 if refer.group(1) != None:
                     self.serve(refer.group(1))
                 sys.exit()
             
             ## N. Add dry ingredients
-            adddry = re.search("Add dry ingredients(?: to the (1st|2nd|3rd|[0-9]+th) mixing bowl)?", ex)
+            adddry = re.search("Add dry ingredients(?: to the (1st|2nd|3rd|[0-9]+th) mixing bowl)?", instruction)
             if adddry != None:
                 def isdry(x):
                     return x[1] == "dry"
@@ -523,7 +523,7 @@ class Chef:
                 self.put(adddry.group(1), [sum(dry), "dry", "sumofall"], text)
             
             ## O. Call for sous-chef
-            auxiliary = re.match("Serve with ([a-zA-Z ]+)", ex)
+            auxiliary = re.match("Serve with ([a-zA-Z ]+)", instruction)
             if auxiliary != None:                                
                 auxtext = re.search(auxiliary.group(1) + "\.\n\n(.*)", self.origscript, re.IGNORECASE|re.DOTALL)
                 if not auxtext: # error!
@@ -544,15 +544,15 @@ class Chef:
                 self.mixingbowls[DEFAULT_BOWL].extend(readymixingbowls[DEFAULT_BOWL])
             
             ## P. Stir
-            stir = re.match("Stir(?: the (1st|2nd|3rd|[0-9]+th) mixing bowl)? for ([1-9]+) minutes?", ex)
+            stir = re.match("Stir(?: the (1st|2nd|3rd|[0-9]+th) mixing bowl)? for ([1-9]+) minutes?", instruction)
             if stir != None:
                 self.stir(stir.group(1),stir.group(2),None)    #Args: mixingbowl, minutes, ingredient
-            stir = re.match("Stir (a-zA-Z0-9 )+ into the (1st|2nd|3rd|[0-9]+th) mixing bowl", ex)
+            stir = re.match("Stir (a-zA-Z0-9 )+ into the (1st|2nd|3rd|[0-9]+th) mixing bowl", instruction)
             if stir != None:
                 self.stir(stir.group(2),0,stir.group(1))    #Args: mixingbowl, minutes, ingredient
             
             ## Q. No standard keyword: look for a verb to begin a loop
-            verb = re.search("([a-zA-Z]+) the ([a-zA-Z ]+) ?(?!until)", ex)
+            verb = re.search("([a-zA-Z]+) the ([a-zA-Z ]+) ?(?!until)", instruction)
             if verb != None:                
                 if "until" in verb.group():
                     continue
@@ -595,7 +595,7 @@ class Chef:
                                 ing = looptext.group(3).rstrip()
                             self.ingredientlist[ing][0] -= 1
             if loop == True:
-                setaside = re.search("Set aside", ex)                
+                setaside = re.search("Set aside", instruction)                
                 if setaside != None:
                     return "ENDOFLOOP"
                 
@@ -638,7 +638,7 @@ class Chef:
     def script(self): return self._script
     
     @property
-    def recipename(self):
+    def recipename(self)->str:
         """
         Lazy instantiation of the recipe name.
 
@@ -675,7 +675,7 @@ class Chef:
         return self._recipename
     
     @property
-    def comment(self):
+    def comment(self)->str:
         """
         Lazy instantiation of the recipe comment.
 
@@ -801,14 +801,14 @@ class Chef:
         return self._ingredients
     
     @property
-    def method(self):
+    def method(self)->list:
         """
         Lazy instantiation to get the method of this recipe.
         If the recipe contains an auxiliary recipe, this just returns the main method.
 
         Returns
         -------
-        _method: dict maybe?
+        _method: list
             The method of this recipe.
 
         """
