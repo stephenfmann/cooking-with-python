@@ -800,6 +800,43 @@ class Chef:
         
         return self._ingredients
     
+    @property
+    def method(self):
+        """
+        Lazy instantiation to get the method of this recipe.
+        If the recipe contains an auxiliary recipe, this just returns the main method.
+
+        Returns
+        -------
+        _method: dict maybe?
+            The method of this recipe.
+
+        """
+        
+        ## Have we already extracted the method?
+        if hasattr(self,"_method"): return self._method
+        
+        ## We haven't yet found the method so we need to find it now.
+        ## First get a copy of <self.script>, deleting everything up to and including 
+        ##  the line declaring the start of the method.
+        match_method_to_end = re.sub(
+            "(.*?)Method.\n", # find everything up to and including the method declaration
+            "", # replace with "" i.e. delete it all
+            self.script, 
+            flags=re.DOTALL, # the dot character . matches newlines
+            count=1) # Just delete everything up to the FIRST method declaration.
+                     # Required because there might be auxiliary recipes.
+        
+        ## From here, each method step is one newline after another,
+        ##  all the way until we reach two newlines.
+        match_method = re.match("(.*?)\n\n", match_method_to_end, re.DOTALL)
+        
+        ## Extract the method steps as a list of strings,
+        ##  omitting the entries corresponding to the final two newlines.
+        self._method = match_method.group().split('\n')[:-2]
+        
+        return self._method
+    
 def load(fpath):
     """
     Load a recipe into a Chef object and return the object without parsing.
