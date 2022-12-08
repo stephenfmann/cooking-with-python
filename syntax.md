@@ -53,7 +53,7 @@ example: \"Hello World Souffle\", or \"Fibonacci Numbers with Caramel
 Sauce\". The recipe title is always the first line of a Chef recipe, and
 is followed by a full stop.
 
-*recipe-title*.
+`recipe-title.`
 
 ### Comments
 
@@ -65,13 +65,12 @@ Comments are optional.
 The next item in a Chef recipe is the ingredient list. This lists the
 ingredients to be used by the program. The syntax is
 
-Ingredients.\
-*\[initial-value\] \[\[measure-type\] measure\] ingredient-name*\
-*\[further ingredients\]*
+`Ingredients.`\
+`[initial-value] [[measure-type] measure] ingredient-name`\
+`[further ingredients]`
 
-Ingredients are listed one per line. The *intial-value* is a number[,
-and is optional. Attempting to use an ingredient without a defined value
-is a run-time error]{.red}. The optional *measure* can be any of the
+Ingredients are listed one per line. The *intial-value* is a number,
+and is optional. The optional *measure* can be any of the
 following:
 
 -   `g | kg | pinch[es]` : These always indicate dry measures.
@@ -91,21 +90,21 @@ ingredient are ignored.
 
 ### Cooking Time
 
-Cooking time: *time* (hour\[s\] \| minute\[s\]).
+`Cooking time: <time> (hour[s] | minute[s]).`
 
 The cooking time statement is optional. The time is a number.
 
 ### Oven Temperature
 
-Pre-heat oven to *temperature* degrees Celsius \[(gas mark *mark*)\].
+`Pre-heat oven to <temperature> degrees Celsius [(gas mark <mark>)].`
 
 Some recipes require baking. If so, there will be an oven temperature
 statement. This is optional. The *temperature* and *mark* are numbers.
 
 ### Method
 
-Method.\
-*method statements*
+`Method.`\
+`method statements`
 
 The method contains the actual recipe instructions. These are written in
 sentences. Line breaks are ignored in the method of a recipe. Valid
