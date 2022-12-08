@@ -207,7 +207,7 @@ method instructions are:
 The final statement in a Chef recipe is a statement of how many people
 it serves.
 
-Serves *number-of-diners*.
+`Serves number-of-diners.`
 
 This statement writes to STDOUT the contents of the first
 *number-of-diners* baking dishes. It begins with the 1st baking dish,
