@@ -57,14 +57,27 @@ class Chef:
 
         """
         
-        ## Loop through each instruction...
-        for instruction in self.method:
+        ## We use a global counter to remember where we are in the recipe.
+        ## This helps e.g. when jumping into and out of loops.
+        ## Initialise the index before starting to cook.
+        self.current_instruction_line = 0
+        
+        ## Begin cooking, stepping through the lines one at a time.
+        ## As long as our current instruction line exists,
+        ##  we will continue to cook.
+        while self.current_instruction_line <= len(self.method):
             
-            ## ...parse and execute this instruction.
-            ## TODO: the `Set aside.` instruction causes the execution
-            ##       to jump to the end of the current loop.
-            ##       How to implement that given the new structure?
+            ## Get the current instruction.
+            ## This is a string, <instruction>, within the list, <self.method>.
+            instruction = self.method[self.current_instruction_line]
+            
+            ## Parse and execute this instruction.
             self.parse_instruction(instruction)
+            
+            ## Increment the current instruction index.
+            ## So long as there were no loops, this will just become
+            ##  1 higher than the previous iteration of the while-loop.
+            self.current_instruction_line += 1
         
         ## Serve the finished dish.
         self.serve()
@@ -79,6 +92,7 @@ class Chef:
         The relevant instruction lines were passed here,
          along with the ingredient name.
         When the value of that ingredient reaches zero,
+         or when the 'Set aside' instruction is reached,
          exit the loop.
 
         Returns
@@ -976,9 +990,9 @@ def load(fpath):
 if __name__ == "__main__":
     try:
         
-        with open(sys.argv[1], "r",encoding='utf-8') as f:
+        with open("recipes/helloworld.chef", "r",encoding='utf-8') as f:
             main = Chef(f.read())
-            logger.info(main.parse())
+            logger.info(main.cook())
             
     except IOError as e:
         logger.error(f'Fatal error: {str(e)}')
