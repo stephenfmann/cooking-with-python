@@ -42,6 +42,9 @@ class Chef:
         
         ## Initialise empty baking dishes.
         self.bakingdishes   = {}
+        
+        ## Initialise boolean to say whether the meal is refrigerated or not.
+        self.refrigerated = False
     
     
     def syntax_error(self,message)->None:
@@ -101,7 +104,7 @@ class Chef:
             self.current_instruction_line += 1
         
         ## Serve the finished dish.
-        self.serve()
+        if not self.refrigerated: self.serve()
     
     
     def cook_loop(self,
@@ -148,11 +151,18 @@ class Chef:
             if ingredient_name_end is not None:
                 self.ingredients[ingredient_name_end] -= 1
         
-        ## Set current index to the final line number of the loop.
+        ## If this recipe has been refrigerated,
+        ##  tell any outer loops we may be in that they can "Set aside"
+        ##  their current processing.
+        if self.refrigerated: return True
+        
+        ## If the meal hasn't been refrigerated, 
+        ##  set the current line index to the final line number of this loop.
         self.current_instruction_line = list(method_lines.keys())[-1]
     
-    
-    def serve(self)->None:
+    def serve(self,
+              number_of_servings = None
+              )->None:
         """
         This statement writes to STDOUT the contents of the first <number> baking dishes. 
         It begins with the 1st baking dish, removing values from the top one by one 
@@ -168,22 +178,22 @@ class Chef:
             ## The serves statement is optional. If it doesn't exist, don't do anything.
             return
         
-        ## The number of people to serve is the first <number> of baking dishes
-        ##  to print to STDOUT.
-        number = int(serves.group(1))
+        ## The number of people to serve is either the argument <number_of_servings>
+        ##  or the number in the statement.
+        if not number_of_servings: number_of_servings = int(serves.group(1))
         
         ## If we don't have that many baking dishes, we will just output all of them.
-        if number > len(self.bakingdishes):
+        if number_of_servings > len(self.bakingdishes):
             
             ## Warn the user.
-            logger.warning("{number} baking dishes requested but only {len(self.bakingdishes)} available.")
+            logger.warning("{number_of_servings} baking dishes requested but only {len(self.bakingdishes)} available.")
             
             ## Just output the baking dishes we actually have.
-            number = len(self.bakingdishes)
+            number_of_servings = len(self.bakingdishes)
         
         ## Loop through all baking dishes and output the contents of each, in order.
         ## We index dishes from 1, for consistency with the Chef language specification.
-        for i in range(DEFAULT_BOWL, number+DEFAULT_BOWL):
+        for i in range(DEFAULT_BOWL, number_of_servings + DEFAULT_BOWL):
             
             ## Because of the way we are stacking objects in lists,
             ##  the FINAL element of the list is the FIRST ingredient in the dish.
@@ -529,23 +539,56 @@ class Chef:
         ##  the calling chef as normal. 
         ## If a number of hours is specified, the recipe will print out 
         ##  its first <number> baking dishes before ending.
-        refer = re.search("Refrigerate (?:for ([0-9]+))? hours", instruction)
-        if refer != None:
-            if refer.group(1) != None:
-                self.serve(refer.group(1))
-            sys.exit()
+        
+        ## Create regex
+        refrigerate_regex = "Refrigerate (?:for ([0-9]+))? hours"
+        
+        ## See if the current line fits this regex.
+        fridge = re.search(refrigerate_regex, instruction)
+        
+        ## If the regex search returned something...   
+        if fridge != None:
+            
+            ## If a number of hours is specified, the recipe will print out 
+            ##  its first <number> baking dishes before ending.
+            if fridge.group(1) != None:
+                self.serve(fridge.group(1))
+            
+            ## End recipe.
+            self.refrigerated = True # So everybody knows it's ended.
+            self.current_instruction_line = len(self.method) # Get out of the main loop
+            return True # Get out of any inner loops
         
         
-        ## N. Add dry ingredients
-        adddry = re.search("Add dry ingredients(?: to the (1st|2nd|3rd|[0-9]+th) mixing bowl)?", instruction)
-        if adddry != None:
+        ## N. Add dry ingredients.
+        ##  `Add dry ingredients [to [nth] mixing bowl].`
+        ## This adds the values of all the dry ingredients together 
+        ##  and places the result into the nth mixing bowl.
+        ## Create regex
+        add_dry_regex = "Add dry ingredients(?: to the (1st|2nd|3rd|[0-9]+th) mixing bowl)?"
+        
+        ## See if the current line fits this regex.
+        add_dry = re.search(add_dry_regex, instruction)
+        
+        ## If the regex search returned something...   
+        if add_dry != None:
+            
+            ## Subroutines to quickly calculate dry values
             def isdry(x):
                 return x[1] == "dry"
+            
             def dryvalues(x):
                 return x[0]
+            
+            ## Get only the dry ingredients
             dry = filter(isdry, self.ingredients.values())
+            
+            ## Get only their values
             dry = map(dryvalues, dry)            
-            self.put(adddry.group(1), [sum(dry), "dry", "sumofall"], instruction)
+            
+            ## Do a put() into the nth mixing bowl.
+            self.put(ingredient = [sum(dry), "dry"],
+                     mixingbowl = add_dry.group(1))
         
         
         ## O. Call for sous-chef
