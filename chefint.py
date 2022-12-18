@@ -3,7 +3,7 @@
     chefint.py
     Interpret programs written in the esolang Chef.
     See syntax.md or https://www.dangermouse.net/esoteric/chef.html for details.
-        (archived at https://web.archive.org/web/20220615003505/http://www.dangermouse.net/esoteric/chef.html)
+     (archived at https://web.archive.org/web/20220615003505/http://www.dangermouse.net/esoteric/chef.html)
 """
 
 import sys, re, random, copy, logging
@@ -30,14 +30,9 @@ class Chef:
     
     def __init__(self, script, mixingbowls = {DEFAULT_BOWL: []}):
         
-        ## Initialise and set object properties
+        ## Initialise and set object properties.
         ## The script of this recipe.
         self._script         = script
-        
-        ## Keep an original copy of the script, because self.script
-        ##  will be slowly modified as we work through each section.
-        ## TODO we will be changing this so that self.script stays the same.
-        # self.origscript     = script
         
         ## If this is an auxiliary recipe, we inherit mixing bowls from the
         ##  calling recipe.
@@ -47,25 +42,30 @@ class Chef:
         ## Initialise empty baking dishes.
         self.bakingdishes   = {}
     
-    def cook(self):
+    
+    def syntax_error(self,message):
         """
-        Replaces self.parse() and self.execute()
-
-        Returns
-        -------
-        None.
-
+            A syntax error was found in the Chef script.
+        """
+        
+        logger.error(f"Syntax error on line {self.current_instruction_line}: {message}")
+        sys.exit(-1)
+        
+    
+    def cook(self)->None:
+        """
+        Step through the recipe's Method and execute each line.
         """
         
         ## We use a global counter to remember where we are in the recipe.
-        ## This helps e.g. when jumping into and out of loops.
+        ## This helps when jumping into and out of loops and error reporting.
         ## Initialise the index before starting to cook.
         self.current_instruction_line = 0
         
         ## Begin cooking, stepping through the lines one at a time.
         ## As long as our current instruction line exists,
         ##  we will continue to cook.
-        while self.current_instruction_line <= len(self.method):
+        while self.current_instruction_line < len(self.method):
             
             ## Get the current instruction.
             ## This is a string, <instruction>, within the list, <self.method>.
@@ -77,16 +77,22 @@ class Chef:
             ## Increment the current instruction index.
             ## So long as there were no loops, this will just become
             ##  1 higher than the previous iteration of the while-loop.
+            ## parse_instruction() handles loops so that when a loop completes,
+            ##  self.current_instruction_line is the final line of the loop
+            ##  (i.e. Verb [the ingredient] until verbed.)
+            ## Therefore adding 1 to it here is correct, as it means we will
+            ##  move to the next instruction after the end of the loop.
             self.current_instruction_line += 1
         
         ## Serve the finished dish.
         self.serve()
     
+    
     def cook_loop(self,
                   method_lines,
                   ingredient_name_start,
                   ingredient_name_end=None
-                  ):
+                  )->None:
         """
         A loop instruction was found in the method.
         The relevant instruction lines were passed here,
@@ -94,11 +100,10 @@ class Chef:
         When the value of that ingredient reaches zero,
          or when the 'Set aside' instruction is reached,
          exit the loop.
-
-        Returns
-        -------
-        None.
-
+         
+         method_lines: dict
+             keys are line numbers,
+             values are instruction strings.
         """
         
         ## The instruction `Set aside.` will cause this loop to immediately terminate.
@@ -108,8 +113,12 @@ class Chef:
         while self.ingredients[ingredient_name_start] != 0:
             
             ## Run through the entire loop (unless `Set aside.` is encountered.)
-            for instruction in method_lines:
+            for line_number, instruction in method_lines.items():
                 
+                ## Set current line number.
+                self.current_instruction_line = line_number
+                
+                ## Execute current instruction.
                 set_aside = self.parse_instruction(instruction)
                 
                 ## `Set aside.` causes the loop to end immediately.
@@ -123,20 +132,17 @@ class Chef:
             if ingredient_name_end is not None:
                 self.ingredients[ingredient_name_end] -= 1
         
+        ## Set current index to the final line number of the loop.
+        self.current_instruction_line = list(method_lines.keys())[-1]
     
-    def serve(self):
+    
+    def serve(self)->None:
         """
         This statement writes to STDOUT the contents of the first <number> baking dishes. 
         It begins with the 1st baking dish, removing values from the top one by one 
          and printing them until the dish is empty, then progresses to the next dish, 
          until all the dishes have been printed. 
         The Serves statement is optional, but is required if the recipe is to output anything!
-    
-
-        Returns
-        -------
-        None.
-
         """
         
         ## Find the Serves statement.
@@ -152,6 +158,11 @@ class Chef:
         
         ## If we don't have that many baking dishes, we will just output all of them.
         if number > len(self.bakingdishes):
+            
+            ## Warn the user.
+            logger.warning("{number} baking dishes requested but only {len(self.bakingdishes)} available.")
+            
+            ## Just output the baking dishes we actually have.
             number = len(self.bakingdishes)
         
         ## Loop through all baking dishes and output the contents of each, in order.
@@ -180,10 +191,16 @@ class Chef:
                 ## Output the value of this ingredient to STDOUT
                 print(value)
     
-    def parse_instruction(self, instruction):
+    
+    def parse_instruction(self, instruction)->bool:
         """
             Main interpreting function.
             Check the text line <instruction> for what action to take.
+            
+        Returns
+        -------
+        bool
+            Whether the `Set aside.` instruction was encountered.
         """
         
         ## `Set aside.`
@@ -194,76 +211,198 @@ class Chef:
         if instruction == "Set aside.":
             return True
         
-        ## 1. Split lines
-        # excode = re.split("\.\s+", text)
         
-        # def stripwhite(x):
-        #     return x.lstrip()
-        # excode = list(map(stripwhite, excode))
-        # excode[-1] = excode[-1][:-1] 
-        
+        ## INTERPRETING THE INSTRUCTION
+        ## For each possible instruction we will use a regex
+        ##  to determine whether the current line is an instance
+        ##  of that instruction.
         
         ## A. Put
-        ## `Put ingredient into [nth] mixing bowl.`
-        ## "This puts the ingredient into the nth mixing bowl."
-        put = re.search("^Put (?:the )?([a-zA-Z ]+) into (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?mixing bowl", instruction)
+        ##  `Put ingredient into [nth] mixing bowl.`
+        ## This puts the ingredient into the nth mixing bowl.
+        ## Create the regex.
+        put_regex = "^Put (?:the )?([a-zA-Z ]+) into (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?mixing bowl"
+        
+        ## See if the current line fits this regex.
+        put = re.search(put_regex, instruction)
+        
+        ## If the regex search returned something...
         if put != None:
             
-            self.put(put.group(2), copy.copy(self.ingredientlist[put.group(1)]))
+            ## ...call the put() method...
+            self.put(put.group(2), copy.copy(self.ingredients[put.group(1)]))
             
+            ## ...and return, so the calling method can move to the next instruction.
             return
         
         
         ## B. Fold
-        fold = re.search("Fold (?:the )?([a-zA-Z ]+) into (?:the )?(1st|2nd|3rd|[0-9]+th)? ?mixing bowl", instruction)
+        ##  `Fold ingredient into [nth] mixing bowl.`
+        ## This removes the top value from the nth mixing bowl 
+        ##  and places it in the ingredient.
+        ## Create the regex.
+        fold_regex = "Fold (?:the )?([a-zA-Z ]+) into (?:the )?(1st|2nd|3rd|[0-9]+th)? ?mixing bowl"
+        
+        ## See if the current line fits this regex.
+        fold = re.search(fold_regex, instruction)
+        
+        ## If the regex search returned something...
         if fold != None:
-            if fold.group(2) == None:
-                self.ambigcheck(instruction)                
+            
+            ## ...ensure that if the bowl number wasn't specified, there is only one bowl...
+            if fold.group(2) == None and self.has_multiple_bowls:
+                self.syntax_error("Bowl number unspecified.") 
+            
+            ## ...call the fold() method...
             self.fold(fold.group(1), fold.group(2))
+            
+            ## ...and return, so the calling method can move to the next instruction.
+            return
+        
         
         ## C. Add
-        add = re.search("Add ([a-zA-Z0-9 ]+?) to (?:the )?(?:(1st|2nd|3rd|[0-9]+th) )?mixing bowl", instruction)
+        ##  `Add ingredient [to [nth] mixing bowl].`
+        ## This adds the value of <ingredient> to the value of the ingredient 
+        ##  on top of the nth mixing bowl and stores the result in the nth mixing bowl.
+        ## Create the regex.
+        add_regex = "Add ([a-zA-Z0-9 ]+?) to (?:the )?(?:(1st|2nd|3rd|[0-9]+th) )?mixing bowl"
+        
+        ## See if the current line fits this regex.
+        add = re.search(add_regex, instruction)
+        
+        ## If the regex search returned something...
         if add != None:
-            if add.group(2) == None:
-                self.ambigcheck(instruction)
+            
+            ## ...ensure that if the bowl number wasn't specified, there is only one bowl...
+            if add.group(2) == None and self.has_multiple_bowls:
+                self.syntax_error("Bowl number unspecified.") 
+            
+            ## ...call the addingredient() method...
             self.addingredient(add.group(1), add.group(2))
+            
+            ## ...and return, so the calling method can move to the next instruction.
+            return
+        
         
         ## D. Remove
-        remove = re.search("Remove ([a-zA-Z0-9 ]+?) from (?:the )?(?:(1st|2nd|3rd|[0-9]+th) )?mixing bowl", instruction)
+        ##  `Remove ingredient [from [nth] mixing bowl].`
+        ## This subtracts the value of <ingredient> from the value of the ingredient 
+        ##  on top of the nth mixing bowl and stores the result in the nth mixing bowl.
+        ## Create the regex.
+        remove_regex = "Remove ([a-zA-Z0-9 ]+?) from (?:the )?(?:(1st|2nd|3rd|[0-9]+th) )?mixing bowl"
+        
+        ## See if the current line fits this regex.
+        remove = re.search(remove_regex, instruction)
+        
+        ## If the regex search returned something...
         if remove != None:
-            if remove.group(2) == None:
-                self.ambigcheck(instruction)
+            
+            ## ...ensure that if the bowl number wasn't specified, there is only one bowl...
+            if remove.group(2) == None and self.has_multiple_bowls:
+                self.syntax_error("Bowl number unspecified.") 
+            
+            ## ...call the removeingredient() method...
             self.removeingredient(remove.group(1), remove.group(2))
             
+            ## ...and return, so the calling method can move to the next instruction.
+            return
+        
+        
         ## E. Combine
-        combine = re.search("Combine ([a-zA-Z0-9 ]+?) into (?:the )?(?:(1st|2nd|3rd|[0-9]+th) )?mixing bowl", instruction)
+        ##  `Combine ingredient [into [nth] mixing bowl].`
+        ## This multiplies the value of <ingredient> by the value of the ingredient 
+        ##  on top of the nth mixing bowl and stores the result in the nth mixing bowl.
+        ## Create the regex.
+        combine_regex = "Combine ([a-zA-Z0-9 ]+?) into (?:the )?(?:(1st|2nd|3rd|[0-9]+th) )?mixing bowl"
+        
+        ## See if the current line fits this regex.
+        combine = re.search(combine_regex, instruction)
+        
+        ## If the regex search returned something...
         if combine != None:
-            if combine.group(2) == None:
-                self.ambigcheck(instruction)
+            
+            ## ...ensure that if the bowl number wasn't specified, there is only one bowl...
+            if combine.group(2) == None and self.has_multiple_bowls:
+                self.syntax_error("Bowl number unspecified.")
+            
+            ## ...call the combineingredient() method...
             self.combineingredient(combine.group(1), combine.group(2))
+            
+            ## ...and return, so the calling method can move to the next instruction.
+            return
+        
         
         ## F. Divide
-        divide = re.search("Divide ([a-zA-Z0-9 ]+?) into (?:the )?(?:(1st|2nd|3rd|[0-9]+th) )?mixing bowl", instruction)
+        ##  `Divide ingredient [into [nth] mixing bowl].`
+        ## This divides the value of <ingredient> into the value of the ingredient 
+        ##  on top of the nth mixing bowl and stores the result in the nth mixing bowl.
+        ## Create the regex.
+        divide_regex = "Divide ([a-zA-Z0-9 ]+?) into (?:the )?(?:(1st|2nd|3rd|[0-9]+th) )?mixing bowl"
+        
+        ## See if the current line fits this regex.
+        divide = re.search(divide_regex, instruction)
+        
+        ## If the regex search returned something...
         if divide != None:
-            if divide.group(2) == None:
-                self.ambigcheck(instruction)
+            
+            ## ...ensure that if the bowl number wasn't specified, there is only one bowl...
+            if divide.group(2) == None and self.has_multiple_bowls:
+                self.syntax_error("Bowl number unspecified.")
+            
+            ## ...call the divideingredient() method...
             self.divideingredient(divide.group(1), divide.group(2))
+            
+            ## ...and return, so the calling method can move to the next instruction.
+            return
+        
         
         ## G. Liquefy mixing bowl
-        liquefy = re.search("Liquefy contents of the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl", instruction)
-        if liquefy != None:                
-            if liquefy.group(1) == None:                    
-                self.ambigcheck(instruction)                
-                for i in self.mixingbowls[DEFAULT_BOWL]:                    
-                    if(i[1] == "dry"):
-                        i[1] = "liquid"                            
+        ##  `Liquefy contents of the [nth] mixing bowl.`
+        ## This turns all the ingredients in the nth mixing bowl into a liquid, 
+        ##  i.e. a Unicode characters for output purposes.
+        ## Create the regex.
+        liquefy_bowl_regex = "Liquefy contents of the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl"
+        
+        ## See if the current line fits this regex.
+        liquefy_bowl = re.search(liquefy_bowl_regex, instruction)
+        
+        ## If the regex search returned something...
+        if liquefy_bowl != None:             
+            
+            ## ...ensure that if the bowl number wasn't specified, there is only one bowl...
+            if liquefy_bowl.group(1) == None and self.has_multiple_bowls:                    
+                self.syntax_error("Bowl number unspecified.")
+            
+            ## ...explicitly define the bowl number...
+            bowl_number = int(liquefy_bowl.group(1)) if liquefy_bowl.group(1) is not None else DEFAULT_BOWL
+            
+            ## ...convert every ingredient in the bowl to liquid...
+            for ingredient in self.mixingbowls[bowl_number]:                    
+                ingredient[1] = "liquid"                            
+            
+            ## ...and return, so the calling method can move to the next instruction.
             return
         
-        ## H. Liquefy ingredient
-        liquefy2 = re.search("Liquefy [a-zA-Z]", instruction)
-        if liquefy2 != None: #
-            self.ingredientlist[liquefy2.group(1)] 
+        
+        ## H. Liquefy ingredient.
+        ##  `Liquefy ingredient.`
+        ## This turns the ingredient into a liquid, 
+        ##  i.e. a Unicode character for output purposes.
+        ## Create the regex.
+        liquefy_ingredient = "Liquefy ([a-zA-Z]+)"
+        
+        ## See if the current line fits this regex.
+        liquefy_ingredient = re.search(liquefy_ingredient, instruction)
+        
+        ## If the regex search returned something...
+        if liquefy_ingredient != None:
+            
+            ## ...set this ingredient's state to liquid...
+            self.ingredients[liquefy_ingredient.group(1)][1] = "liquid"
+            
+            ## ...and return, so the calling method can move to the next instruction.
             return
+        
         
         ## I. Clean mixing bowl
         clean = re.search("Clean the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl", instruction)
@@ -309,7 +448,9 @@ class Chef:
             return
         
         ## L. Pour
-        pour = re.search("Pour contents of the (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?mixing bowl into the (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?baking dish", instruction)            
+        pour_regex = "Pour contents of the (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?mixing bowl"+\
+                        " into the (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?baking dish"
+        pour = re.search(pour_regex, instruction)            
         if pour != None:                
             if pour.group(1) == None:
                 key = DEFAULT_BOWL
@@ -319,7 +460,9 @@ class Chef:
                 key2 = DEFAULT_BOWL
             else:
                 key2 = int(pour.group(2))
-            self.ambigcheck(instruction, True)
+                
+            ## TODO check multiple bowls and multiple dishes
+            
             if not key2 in self.bakingdishes:                    
                 self.bakingdishes[key2] = []
             self.bakingdishes[key2].extend(self.mixingbowls[key])            
@@ -393,7 +536,6 @@ class Chef:
                 ## Find everything in between the loop 
                 ## TODO - watch out for nested loops with the same verb!
                 
-                #looptext = re.search(verb.group() + "\.((.*?)\s+[a-zA-Z]+ (?:the ([a-zA-Z ]+)) until " + verbw + "ed)", text, re.DOTALL|re.IGNORECASE)
                 re_text = verb.group() + "\.((.*?)\s+[a-zA-Z]+ ?(?:(the )?([a-zA-Z ]+))? ?until " + verbw + "ed)"
                 looptext = re.search(re_text, instruction, re.DOTALL|re.IGNORECASE)
                 
@@ -423,51 +565,6 @@ class Chef:
         self.syntax_error("Instruction not recognised: {instruction}")
         
         
-        
-    def syntax_error(self,message):
-        """
-            A syntax error was found in the Chef script.
-        """
-        
-        ## TODO: report line number.
-        logger.error(f"Syntax error: {message}")
-        sys.exit(-1)
-        
-    def cooking_error(self,message):
-        """
-            A runtime error
-        """
-        
-        ## TODO - report line number
-        logger.error(f"Cooking time error: {message}")
-        sys.exit()
-
-        
-    def ambigcheck(self, text, dish=False):
-        """
-            
-            'If no identifier is used, the recipe only has one of the relevant utensil.'
-        
-            A mixing bowl may not be used without a number if other mixing bowls use numbers. 
-            Same goes for baking dishes.
-        """
-        
-        if re.match("the (1st|2nd|3rd|[0-9]+th) mixing bowl", text) != None:
-            self.syntax_error("Ambigious mixing bowl")
-        
-        if dish==True:
-            if re.match("the (1st|2nd|3rd|[0-9]+th) baking dish", text) != None:
-                self.syntax_error("Ambigious baking dish")
-                
-    def valuecheck(self, ingredient):
-        """
-            Ingredients may be defined without a value, but not used without one.
-        """
-        
-        if self.ingredientlist[ingredient][0] == None:
-            self.cooking_error("Cooking time error: tried to access ingredient "+\
-                               ingredient + ", which is not ready for use.")
-            
     def put(self, mixingbowl, value):
         """
             Add an ingredient to a mixing bowl.
@@ -988,15 +1085,15 @@ def load(fpath):
     return chef
 
 if __name__ == "__main__":
-    try:
+    # try:
         
-        with open("recipes/helloworld.chef", "r",encoding='utf-8') as f:
-            main = Chef(f.read())
-            logger.info(main.cook())
+    with open("recipes/helloworld.chef", "r",encoding='utf-8') as f:
+        main = Chef(f.read())
+        main.cook()
             
-    except IOError as e:
-        logger.error(f'Fatal error: {str(e)}')
+    # except IOError as e:
+    #     logger.error(f'Fatal error: {str(e)}')
         
         
-    except IndexError as e:
-        logger.error(f'Fatal error: {str(e)}')
+    # except IndexError as e:
+    #     logger.error(f'Fatal error: {str(e)}')
