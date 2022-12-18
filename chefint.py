@@ -9,7 +9,8 @@
 import sys, re, random, copy, logging
 
 ## Global constants
-DEFAULT_BOWL = 1 # the default mixing bowl number (also applies to baking dishes)
+DEFAULT_BOWL = 1 # the default mixing bowl number
+DEFAULT_DISH = 1 # the default baking dish number
 
 ## Configure logging
 logger = logging.getLogger("Chef")
@@ -64,7 +65,7 @@ class Chef:
         logger.error(f"Runtime error on line {self.current_instruction_line}: {message}")
         sys.exit(-1)
     
-    def cook(self)->None:
+    def cook(self,debug=True)->None:
         """
         Step through the recipe's Method and execute each line.
         """
@@ -84,7 +85,7 @@ class Chef:
             instruction = self.method[self.current_instruction_line]
             
             ## DEBUG
-            print(f"Executing: {instruction}")
+            if debug: print(f"Executing: {instruction}")
             
             ## Parse and execute this instruction.
             self.parse_instruction(instruction)
@@ -494,33 +495,46 @@ class Chef:
             ## ...and return, so the calling method can move to the next instruction.
             return
         
+        
         ## L. Pour
+        ##  `Pour contents of the [nth] mixing bowl into the [pth] baking dish.`
+        ##  This copies all the ingredients from the nth mixing bowl to the 
+        ##   pth baking dish, retaining the order and putting them 
+        ##   on top of anything already in the baking dish.
+        ## Create the regex
         pour_regex = "Pour contents of the (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?mixing bowl"+\
                         " into the (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?baking dish"
-        pour = re.search(pour_regex, instruction)            
-        if pour != None:                
-            if pour.group(1) == None:
-                key = DEFAULT_BOWL
-            else:
-                key = int(pour.group(1))
-            if pour.group(2) == None:                    
-                key2 = DEFAULT_BOWL
-            else:
-                key2 = int(pour.group(2))
-                
-            ## TODO check multiple bowls and multiple dishes
+        
+        ## See if the current line fits this regex.
+        pour = re.search(pour_regex, instruction)   
+
+        ## If the regex search returned something...   
+        if pour != None:
+
+            ## ...call the pour() method...
+            self.pour(
+                mixingbowl = pour.group(1),
+                bakingdish = pour.group(2)
+                )           
             
-            if not key2 in self.bakingdishes:                    
-                self.bakingdishes[key2] = []
-            self.bakingdishes[key2].extend(self.mixingbowls[key])            
+            ## ...and return, so the calling method can move to the next instruction.
             return
         
+        
         ## M. Refrigerate
+        ##  `Refrigerate [for number hours].`
+        ## This causes execution of the recipe in which it appears to end immediately.
+        ## If in an auxiliary recipe, the auxiliary recipe ends and 
+        ##  the sous-chef's first mixing bowl is passed back to 
+        ##  the calling chef as normal. 
+        ## If a number of hours is specified, the recipe will print out 
+        ##  its first <number> baking dishes before ending.
         refer = re.search("Refrigerate (?:for ([0-9]+))? hours", instruction)
         if refer != None:
             if refer.group(1) != None:
                 self.serve(refer.group(1))
             sys.exit()
+        
         
         ## N. Add dry ingredients
         adddry = re.search("Add dry ingredients(?: to the (1st|2nd|3rd|[0-9]+th) mixing bowl)?", instruction)
@@ -532,6 +546,7 @@ class Chef:
             dry = filter(isdry, self.ingredients.values())
             dry = map(dryvalues, dry)            
             self.put(adddry.group(1), [sum(dry), "dry", "sumofall"], instruction)
+        
         
         ## O. Call for sous-chef
         auxiliary = re.match("Serve with ([a-zA-Z ]+)", instruction)
@@ -621,7 +636,13 @@ class Chef:
         ## Use the default bowl if none was supplied
         if not mixingbowl: mixingbowl = DEFAULT_BOWL
         
-        ## Add value to top of mixingbowl
+        ## Check the ingredient exists
+        if ingredient not in self.ingredients: self.syntax_error(f"Ingredient not found: {ingredient}")
+        
+        ## Check the mixing bowl exists
+        if mixingbowl not in self.mixingbowls: self.runtime_error(f"Mixing bowl {mixingbowl} does not exist.")
+        
+        ## Add ingredient to top of mixingbowl
         self.mixingbowls[mixingbowl].append(self.ingredients[ingredient])
         
         
@@ -758,7 +779,45 @@ class Chef:
         ##  <-1> indicates the top ingredient, which is a list with entries [value, wet/dry, name]
         ##  <0> is the first entry in that list, i.e. the ingredient's value.
         self.mixingbowls[key][-1][0] = float(self.mixingbowls[key][-1][0]/value)
+    
+    
+    def pour(self,
+             mixingbowl = None,
+             bakingdish = None
+             )->None:
+        """
+        This copies all the ingredients from the nth mixing bowl 
+         to the pth baking dish, retaining the order and putting them 
+         on top of anything already in the baking dish.
+
+        Parameters
+        ----------
+        mixingbowl : TYPE, optional
+            DESCRIPTION. The default is None.
+        bakingdish : TYPE, optional
+            DESCRIPTION. The default is None.
+
+        Returns
+        -------
+        None
+            DESCRIPTION.
+
+        """
         
+        ## Revert to default mixing bowl if necessary
+        mixingbowl = int(mixingbowl[:-2]) if mixingbowl else DEFAULT_BOWL
+        
+        ## Revert to default baking dish if necessary
+        bakingdish = int(bakingdish[:-2]) if bakingdish else DEFAULT_DISH
+        
+        ## Create the baking dish if necessary
+        if not bakingdish in self.bakingdishes:                    
+            self.bakingdishes[bakingdish] = []
+        
+        ## Copy contents of mixing bowl into baking dish
+        self.bakingdishes[bakingdish].extend(self.mixingbowls[mixingbowl]) 
+        
+    
     def stir(self,
              mixingbowl = DEFAULT_BOWL,
              minutes    = None,
