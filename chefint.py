@@ -43,14 +43,26 @@ class Chef:
         self.bakingdishes   = {}
     
     
-    def syntax_error(self,message):
+    def syntax_error(self,message)->None:
         """
             A syntax error was found in the Chef script.
         """
         
         logger.error(f"Syntax error on line {self.current_instruction_line}: {message}")
         sys.exit(-1)
+    
+    def runtime_error(self,message)->None:
+        """
+        A runtime error occurred during cooking.
+
+        Parameters
+        ----------
+        message : string
+            Information about the error.
+        """
         
+        logger.error(f"Runtime error on line {self.current_instruction_line}: {message}")
+        sys.exit(-1)
     
     def cook(self)->None:
         """
@@ -70,6 +82,9 @@ class Chef:
             ## Get the current instruction.
             ## This is a string, <instruction>, within the list, <self.method>.
             instruction = self.method[self.current_instruction_line]
+            
+            ## DEBUG
+            print(f"Executing: {instruction}")
             
             ## Parse and execute this instruction.
             self.parse_instruction(instruction)
@@ -230,7 +245,7 @@ class Chef:
         if put != None:
             
             ## ...call the put() method...
-            self.put(put.group(2), copy.copy(self.ingredients[put.group(1)]))
+            self.put(ingredient=put.group(1), mixingbowl=put.group(2))
             
             ## ...and return, so the calling method can move to the next instruction.
             return
@@ -374,7 +389,7 @@ class Chef:
                 self.syntax_error("Bowl number unspecified.")
             
             ## ...explicitly define the bowl number...
-            bowl_number = int(liquefy_bowl.group(1)) if liquefy_bowl.group(1) is not None else DEFAULT_BOWL
+            bowl_number = int(liquefy_bowl.group(1)[:-2]) if liquefy_bowl.group(1) is not None else DEFAULT_BOWL
             
             ## ...convert every ingredient in the bowl to liquid...
             for ingredient in self.mixingbowls[bowl_number]:                    
@@ -405,46 +420,78 @@ class Chef:
         
         
         ## I. Clean mixing bowl
-        clean = re.search("Clean the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl", instruction)
+        ##  `Clean [nth] mixing bowl.`
+        ## This removes all the ingredients from the nth mixing bowl.
+        ## Create the regex.
+        clean_regex = "Clean the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl"
+        
+        ## See if the current line fits this regex.
+        clean = re.search(clean_regex, instruction)
+        
+        ## If the regex search returned something...
         if clean != None:
-            if clean.group(1) == None:
-                    self.mixingbowls[DEFAULT_BOWL] = []
-            else:
-                if clean.group(1)[:-2] in self.mixingbowls:
-                    self.mixingbowls[clean.group(1)[:-2]] = []
-                else:
-                    existslater = re.match(clean.group(1) + " mixing bowl", instruction)
-                    if existslater == None:
-                        logger.warning("Warning: Unknown mixing bowl"+str(clean.group(1)))
-                    else:
-                        logger.warning("Warning: Tried to clean mixing bowl"+str(clean.group(1))+"before putting anything in it!")
+            
+            ## ...ensure that if the bowl number wasn't specified, there is only one bowl...
+            if clean.group(1) == None and self.has_multiple_bowls:                    
+                self.syntax_error("Bowl number unspecified.")
+            
+            ## ...explicitly define the bowl number...
+            bowl_number = int(clean.group(1)[:-2]) if clean.group(1) is not None else DEFAULT_BOWL
+            
+            ## ...remove all ingredients from that bowl...
+            self.mixingbowls[bowl_number] = []
+            
+            ## ...and return, so the calling method can move to the next instruction.
             return
+        
         
         ## J. Mix mixing bowl
-        mix = re.search("Mix the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl well", instruction)
+        ##  `Mix [the [nth] mixing bowl] well.`
+        ## This randomises the order of the ingredients in the nth mixing bowl.
+        ## Create the regex.
+        mix_regex = "Mix the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl well"
+        
+        ## See if the current line fits this regex.
+        mix = re.search(mix_regex, instruction)
+        
+        ## If the regex search returned something...
         if mix != None:
-            if mix.group(1) == None:
-                    random.shuffle(self.mixingbowls[DEFAULT_BOWL])
-            else:
-                if mix.group(1)[:-2] in self.mixingbowls:
-                    random.shuffle(self.mixingbowls[clean.mix(1)[:-2]])
-                else:
-                    existslater = re.match(clean.mix(1) + " mixing bowl", instruction)
-                    if existslater == None:
-                        logger.warning("Warning: Unknown mixing bowl"+mix.group(1))
-                    else:
-                        logger.warning("Warning: Tried to mix mixing bowl"+str(mix.group(1))+"before putting anything in it!")
+            
+            ## ...ensure that if the bowl number wasn't specified, there is only one bowl...
+            if mix.group(1) == None and self.has_multiple_bowls:                    
+                self.syntax_error("Bowl number unspecified.")
+            
+            ## ...explicitly define the bowl number...
+            bowl_number = int(mix.group(1)[:-2]) if mix.group(1) is not None else DEFAULT_BOWL
+            
+            ## ...randomise the ingredients in that bowl...
+            random.shuffle(self.mixingbowls[bowl_number])
+            
+            ## ...and return, so the calling method can move to the next instruction.
             return
         
+        
         ## K. Take from fridge
-        fridge = re.search("Take ([a-zA-Z ]+) from refrigerator", instruction)
+        ##  `Take ingredient from refrigerator.`
+        ## This reads a numeric value from STDIN into the ingredient named, 
+        ##  overwriting any previous value.
+        ## Create the regex.
+        fridge_take_regex = "Take ([a-zA-Z ]+) from refrigerator"
+        
+        ## See if the current line fits this regex.
+        fridge = re.search(fridge_take_regex, instruction)
+        
+        ## If the regex search returned something...
         if fridge != None:
-            if fridge.group(1) in self.ingredientlist:
-                value = int(input(fridge.group(1) + ": ")) # sfm renamed raw_input to input 2->3
-                if self.ingredientlist[fridge.group(1)][1] == "liquid":
-                    self.ingredientlist[fridge.group(1)][0] = chr(value)
-                else:
-                    self.ingredientlist[fridge.group(1)][0] = value
+            
+            ## ...check the ingredient exists...
+            if fridge.group(1) not in self.ingredients:
+                self.syntax_error("Ingredient {fridge.group(1)} does not exist.")
+            
+            ## ...get the user input and store it as the value of the specified ingredient...
+            self.ingredients[fridge.group(1)][0] = int(input(fridge.group(1) + ": "))
+            
+            ## ...and return, so the calling method can move to the next instruction.
             return
         
         ## L. Pour
@@ -482,7 +529,7 @@ class Chef:
                 return x[1] == "dry"
             def dryvalues(x):
                 return x[0]
-            dry = filter(isdry, self.ingredientlist.values())
+            dry = filter(isdry, self.ingredients.values())
             dry = map(dryvalues, dry)            
             self.put(adddry.group(1), [sum(dry), "dry", "sumofall"], instruction)
         
@@ -520,9 +567,9 @@ class Chef:
         if verb != None:                
             if "until" in verb.group():
                 return
-            if not verb.group(2) in self.ingredientlist:    # verb.group(2) is the ingredient
+            if not verb.group(2) in self.ingredients:    # verb.group(2) is the ingredient
                 return
-            if self.ingredientlist[verb.group(2)][0] == 0:
+            if self.ingredients[verb.group(2)][0] == 0:
                 return
             else:
                 ## Verb Maintenance
@@ -537,7 +584,8 @@ class Chef:
                 ## TODO - watch out for nested loops with the same verb!
                 
                 re_text = verb.group() + "\.((.*?)\s+[a-zA-Z]+ ?(?:(the )?([a-zA-Z ]+))? ?until " + verbw + "ed)"
-                looptext = re.search(re_text, instruction, re.DOTALL|re.IGNORECASE)
+                
+                looptext = re.search(re_text, self.script, re.DOTALL|re.IGNORECASE)
                 
                 if not looptext:
                     logger.error(f'Verb unmatched. Could not find "{re_text}" in "{instruction}"')
@@ -547,7 +595,7 @@ class Chef:
                 # deltext = map(stripwhite, deltext)
                 # for d in deltext:
                 #     excode.remove(d)
-                while self.ingredientlist[verb.group(2)][0] != 0:
+                while self.ingredients[verb.group(2)][0] != 0:
                     r = self.execute(looptext.group(2), True)
                     if r == "ENDOFLOOP":
                         break
@@ -556,7 +604,7 @@ class Chef:
                             ing = looptext.group(4).rstrip()
                         else:
                             ing = looptext.group(3).rstrip()
-                        self.ingredientlist[ing][0] -= 1
+                        self.ingredients[ing][0] -= 1
         
         
         ## Looks like nothing happened.
@@ -565,38 +613,17 @@ class Chef:
         self.syntax_error("Instruction not recognised: {instruction}")
         
         
-    def put(self, mixingbowl, value):
+    def put(self, ingredient, mixingbowl):
         """
-            Add an ingredient to a mixing bowl.
+        This puts the ingredient into the nth mixing bowl.
         """
         
-        ## If no mixing bowl was specified, put the ingredient into the default one.
-        if mixingbowl == None:
-            
-            ## If no mixing bowl number was supplied, check we have exactly one mixing bowl.
-            ## Otherwise it's an error.
-            if self.has_multiple_bowls:                    
-                
-                ## TODO: report the full instruction line.
-                self.syntax_error("Bowl not supplied in Put statement.")
-            
-            ## Does the default mixing bowl already exist?
-            if len(self.mixingbowls) > 0:
-                self.mixingbowls[DEFAULT_BOWL].append(value)
-                return
-            
-            ## If no mixing bowls exist, create the first one and 
-            ##  add this ingredient to it.
-            self.mixingbowls[DEFAULT_BOWL] = [value]
-            return
+        ## Use the default bowl if none was supplied
+        if not mixingbowl: mixingbowl = DEFAULT_BOWL
         
-        ## Mixing bowl exists.
-        key = int(mixingbowl)
-        if not key in self.mixingbowls:
-            self.mixingbowls[key] = []     
-            
-        self.mixingbowls[key].append(value)
-            
+        ## Add value to top of mixingbowl
+        self.mixingbowls[mixingbowl].append(self.ingredients[ingredient])
+        
         
     def fold(self, 
              ingredient, 
@@ -629,25 +656,36 @@ class Chef:
         full_ingredient = self.mixingbowls[key].pop()
         
         ## Put the removed ingredient's value onto the named ingredient.
-        self.ingredientlist[ingredient][0] = full_ingredient[0]
+        self.ingredients[ingredient][0] = full_ingredient[0]
         
         
-    def addingredient(self, ingredient, mixingbowl):
+    def addingredient(self, 
+                      ingredient, 
+                      mixingbowl
+                      ):
         """
             Add the value of <ingredient> to the value of the ingredient 
              on top of the mixing bowl and store the result in the mixing bowl.
         """
         
-        value = self.ingredientlist[ingredient][0]
+        ## If no mixing bowl was supplied, use the default
+        if not mixingbowl: mixingbowl = DEFAULT_BOWL
         
-        key = DEFAULT_BOWL
-        if mixingbowl:
-            key = int(mixingbowl[:-2])
-            
-        if value == None:
-            value = 0
+        ## Check the ingredient exists
+        if ingredient not in self.ingredients: self.syntax_error(f"Ingredient not found: {ingredient}")
         
-        self.mixingbowls[key][-1][0] += value
+        ## Check the mixing bowl exists
+        if mixingbowl not in self.mixingbowls: self.runtime_error(f"Mixing bowl {mixingbowl} does not exist.")
+        
+        ## Get the value of the ingredient
+        value = self.ingredients[ingredient][0]
+        
+        ## It's mixing bowl number <mixingbowl>
+        ## It's the top ingredient, which is index -1
+        ## It's the value of that ingredient, which is index 0
+        ## Altogether, that's self.mixingbowls[mixingbowl][-1][0].
+        ## We add the specified ingredient's value to that.
+        self.mixingbowls[mixingbowl][-1][0] += value
         
     def removeingredient(self, ingredient, mixingbowl):
         """
@@ -655,7 +693,7 @@ class Chef:
              on top of the mixing bowl and store the result in the mixing bowl.
         """
         
-        value = self.ingredientlist[ingredient][0]
+        value = self.ingredients[ingredient][0]
         
         key = DEFAULT_BOWL
         if mixingbowl:
@@ -672,7 +710,7 @@ class Chef:
              on top of the mixing bowl and store the result in the mixing bowl.
         """
         
-        value = self.ingredientlist[ingredient][0]
+        value = self.ingredients[ingredient][0]
         
         key = DEFAULT_BOWL
         if mixingbowl:
@@ -704,7 +742,7 @@ class Chef:
         """
         
         ## Get the divisor: the value of <ingredient>.
-        value = self.ingredientlist[ingredient][0]
+        value = self.ingredients[ingredient][0]
         
         ## Get the mixing bowl number.
         key = DEFAULT_BOWL
@@ -741,7 +779,7 @@ class Chef:
         ## Alternative is "Stir <ingredient> into the [nth] mixing bowl."
         ## Default to this if <ingredient> is supplied.
         if ingredient:
-            value = int(self.ingredientlist[ingredient][0])
+            value = int(self.ingredients[ingredient][0])
         
         ## Default to the zeroth mixing bowl
         key = DEFAULT_BOWL
@@ -1085,15 +1123,8 @@ def load(fpath):
     return chef
 
 if __name__ == "__main__":
-    # try:
         
     with open("recipes/helloworld.chef", "r",encoding='utf-8') as f:
         main = Chef(f.read())
-        main.cook()
-            
-    # except IOError as e:
-    #     logger.error(f'Fatal error: {str(e)}')
-        
-        
-    # except IndexError as e:
-    #     logger.error(f'Fatal error: {str(e)}')
+    
+    main.cook()
