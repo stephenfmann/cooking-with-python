@@ -29,19 +29,22 @@ class Chef:
         Calls instances of itself to hold and cook auxiliary recipes.
     """
     
-    def __init__(self, script, mixingbowls = {DEFAULT_BOWL: []}):
+    def __init__(self, 
+                 script, 
+                 mixing_bowls = {DEFAULT_BOWL: []},
+                 baking_dishes = {DEFAULT_DISH: []}
+                 ):
         
         ## Initialise and set object properties.
         ## The script of this recipe.
         self._script         = script
         
-        ## If this is an auxiliary recipe, we inherit mixing bowls from the
-        ##  calling recipe.
-        ## We make a copy so as not to modify the original mixing bowls.
-        self.mixingbowls    = copy.deepcopy(mixingbowls)
-        
-        ## Initialise empty baking dishes.
-        self.bakingdishes   = {}
+        ## If this is an auxiliary recipe, we inherit mixing bowls and baking dishes
+        ##  from the calling recipe.
+        ## The calling method should have already created copies of these,
+        ##  so we are free to change them at will.
+        self.mixing_bowls    = mixing_bowls
+        self.baking_dishes   = baking_dishes
         
         ## Initialise boolean to say whether the meal is refrigerated or not.
         self.refrigerated = False
@@ -52,7 +55,17 @@ class Chef:
             A syntax error was found in the Chef script.
         """
         
-        logger.error(f"Syntax error on line {self.current_instruction_line}: {message}")
+        error_msg = f"Syntax error in {self.recipename}"
+        
+        ## Add the line number, if it's in the method
+        if hasattr(self, "current_instruction_line"):
+            
+            error_msg += f" Method line {self.current_instruction_line}."
+        
+        ## Report the actual message
+        error_msg += f" Message: {message}"
+        
+        logger.error(error_msg)
         sys.exit(-1)
     
     def runtime_error(self,message)->None:
@@ -183,13 +196,13 @@ class Chef:
         if not number_of_servings: number_of_servings = int(serves.group(1))
         
         ## If we don't have that many baking dishes, we will just output all of them.
-        if number_of_servings > len(self.bakingdishes):
+        if number_of_servings > len(self.baking_dishes):
             
             ## Warn the user.
-            logger.warning("{number_of_servings} baking dishes requested but only {len(self.bakingdishes)} available.")
+            logger.warning("{number_of_servings} baking dishes requested but only {len(self.baking_dishes)} available.")
             
             ## Just output the baking dishes we actually have.
-            number_of_servings = len(self.bakingdishes)
+            number_of_servings = len(self.baking_dishes)
         
         ## Loop through all baking dishes and output the contents of each, in order.
         ## We index dishes from 1, for consistency with the Chef language specification.
@@ -205,7 +218,7 @@ class Chef:
             ## (Starts at the very beginning, ends at the very end, but steps "backwards".)
             ## See https://stackoverflow.com/questions/931092/reverse-a-string-in-python
              
-            for j in self.bakingdishes[i][::-1]:
+            for j in self.baking_dishes[i][::-1]:
                 
                 ## Get the value of this ingredient
                 value = j[0]
@@ -403,7 +416,7 @@ class Chef:
             bowl_number = int(liquefy_bowl.group(1)[:-2]) if liquefy_bowl.group(1) is not None else DEFAULT_BOWL
             
             ## ...convert every ingredient in the bowl to liquid...
-            for ingredient in self.mixingbowls[bowl_number]:                    
+            for ingredient in self.mixing_bowls[bowl_number]:                    
                 ingredient[1] = "liquid"                            
             
             ## ...and return, so the calling method can move to the next instruction.
@@ -434,7 +447,7 @@ class Chef:
         ##  `Clean [nth] mixing bowl.`
         ## This removes all the ingredients from the nth mixing bowl.
         ## Create the regex.
-        clean_regex = "Clean the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl"
+        clean_regex = "Clean (1st|2nd|3rd|[0-9]+th)? ?mixing bowl"
         
         ## See if the current line fits this regex.
         clean = re.search(clean_regex, instruction)
@@ -450,7 +463,7 @@ class Chef:
             bowl_number = int(clean.group(1)[:-2]) if clean.group(1) is not None else DEFAULT_BOWL
             
             ## ...remove all ingredients from that bowl...
-            self.mixingbowls[bowl_number] = []
+            self.mixing_bowls[bowl_number] = []
             
             ## ...and return, so the calling method can move to the next instruction.
             return
@@ -476,7 +489,7 @@ class Chef:
             bowl_number = int(mix.group(1)[:-2]) if mix.group(1) is not None else DEFAULT_BOWL
             
             ## ...randomise the ingredients in that bowl...
-            random.shuffle(self.mixingbowls[bowl_number])
+            random.shuffle(self.mixing_bowls[bowl_number])
             
             ## ...and return, so the calling method can move to the next instruction.
             return
@@ -592,25 +605,29 @@ class Chef:
         
         
         ## O. Call for sous-chef
-        auxiliary = re.match("Serve with ([a-zA-Z ]+)", instruction)
-        if auxiliary != None:                                
-            auxtext = re.search(auxiliary.group(1) + "\.\n\n(.*)", self.origscript, re.IGNORECASE|re.DOTALL)
-            if not auxtext: # error!
-                logger.error("A sub-recipe was listed but could not be found. Try hiring a new sous-chef?")
-                raise IOError
+        ##  `Serve with auxiliary-recipe.`
+        ## This invokes a sous-chef to immediately preepare the named auxiliary-recipe. 
+        ## The calling chef waits until the sous-chef is finished before continuing. 
+        ## When the auxiliary recipe is finished, the ingredients in its first mixing bowl 
+        ##  are placed in the same order into the calling chef's first mixing bowl.
+        ## Create the regex.
+        aux_regex = "Serve with ([a-zA-Z ]+\.)"
+        
+        ## See if this line matches the syntax.
+        auxiliary = re.match(aux_regex, instruction)
+        
+        ## This line is calling for a sous-chef!
+        if auxiliary != None:      
             
-            ## Quick fix to recursion error
-            try:
-                souschef = Chef(auxtext.group(), copy.copy(self.mixingbowls))
-                souschef.parse()
-            except RecursionError:
-                msg = f'Error: Your sub-recipe {str(auxiliary.group(1))} contains a reference to itself. '+\
-                    'The kitchen is not equipped to handle infinite recursion.'
-                logging.error(msg)
-                sys.exit(-1)
+            ## Call sous-chef.
+            ## The name of the recipe is what the regex found above.
+            self.call_sous_chef(
+                aux_recipe_name = auxiliary.group(1)
+                )                         
             
-            readymixingbowls = souschef.mixingbowls                
-            self.mixingbowls[DEFAULT_BOWL].extend(readymixingbowls[DEFAULT_BOWL])
+            return
+            
+        
         
         ## P. Stir
         stir = re.match("Stir(?: the (1st|2nd|3rd|[0-9]+th) mixing bowl)? for ([1-9]+) minutes?", instruction)
@@ -668,8 +685,57 @@ class Chef:
         ## Looks like nothing happened.
         ## This instruction contains no recognisable code,
         ##  so flag it as a syntax error.
-        self.syntax_error("Instruction not recognised: {instruction}")
+        self.syntax_error(f"Instruction not recognised: {instruction}")
+    
+    
+    def call_sous_chef(self,aux_recipe_name)->None:
+        """
+        Execute the auxiliary recipe <aux_recipe_name>,
+         passing the sous-chef all current bowls and dishes.
         
+        Get the sous-chef's resultant first bowl
+         and dump it into the current chef's first bowl.
+
+        Parameters
+        ----------
+        aux_recipe_name : string
+            The name of the auxiliary recipe that the sous-chef will cook.
+        """
+        
+        ## Get the script of the auxiliary recipe
+        ##  from a class property that stores info about
+        ##  all auxiliary recipes.
+        ## First check it exists.
+        if aux_recipe_name not in self.auxiliary_recipes:
+            
+            ## The main script called for an auxiliary recipe,
+            ##  but the auxiliary recipe doesn't exist.
+            ## Create error message.
+            error_message = f"Auxiliary recipe {aux_recipe_name} not found."
+            error_message += " Try hiring a new sous-chef?"
+            
+            ## If there are any available auxiliary recipes, list them
+            ##  in the error message.
+            if len(self.auxiliary_recipes) > 0:
+                
+                error_message += f" Available recipes: {', '.join(self.auxiliary_recipes.keys())}"
+            
+            self.runtime_error(error_message)
+        
+        ## Get the auxiliary script.
+        aux_recipe_script = self.auxiliary_recipes[aux_recipe_name]["script"]
+        
+        ## Call the sous-chef to cook the auxiliary recipe.
+        sous_chef = Chef(script = aux_recipe_script, 
+                         mixing_bowls  = copy.copy(self.mixing_bowls),
+                         baking_dishes = copy.copy(self.baking_dishes)
+                         )
+        sous_chef.cook()
+        
+        ## Now take the contents of the sous-chef's first mixing bowl
+        ##  and pour them into the current chef's first mixing bowl.
+        self.mixing_bowls[DEFAULT_BOWL].extend(sous_chef.mixing_bowls[DEFAULT_BOWL])
+    
         
     def put(self, ingredient, mixingbowl):
         """
@@ -683,10 +749,10 @@ class Chef:
         if ingredient not in self.ingredients: self.syntax_error(f"Ingredient not found: {ingredient}")
         
         ## Check the mixing bowl exists
-        if mixingbowl not in self.mixingbowls: self.runtime_error(f"Mixing bowl {mixingbowl} does not exist.")
+        if mixingbowl not in self.mixing_bowls: self.runtime_error(f"Mixing bowl {mixingbowl} does not exist.")
         
         ## Add ingredient to top of mixingbowl
-        self.mixingbowls[mixingbowl].append(self.ingredients[ingredient])
+        self.mixing_bowls[mixingbowl].append(self.ingredients[ingredient])
         
         
     def fold(self, 
@@ -717,7 +783,7 @@ class Chef:
             key = int(mixingbowl[:-2])
         
         ## Get the ingredient out of the bowl
-        full_ingredient = self.mixingbowls[key].pop()
+        full_ingredient = self.mixing_bowls[key].pop()
         
         ## Put the removed ingredient's value onto the named ingredient.
         self.ingredients[ingredient][0] = full_ingredient[0]
@@ -739,7 +805,7 @@ class Chef:
         if ingredient not in self.ingredients: self.syntax_error(f"Ingredient not found: {ingredient}")
         
         ## Check the mixing bowl exists
-        if mixingbowl not in self.mixingbowls: self.runtime_error(f"Mixing bowl {mixingbowl} does not exist.")
+        if mixingbowl not in self.mixing_bowls: self.runtime_error(f"Mixing bowl {mixingbowl} does not exist.")
         
         ## Get the value of the ingredient
         value = self.ingredients[ingredient][0]
@@ -747,9 +813,9 @@ class Chef:
         ## It's mixing bowl number <mixingbowl>
         ## It's the top ingredient, which is index -1
         ## It's the value of that ingredient, which is index 0
-        ## Altogether, that's self.mixingbowls[mixingbowl][-1][0].
+        ## Altogether, that's self.mixing_bowls[mixingbowl][-1][0].
         ## We add the specified ingredient's value to that.
-        self.mixingbowls[mixingbowl][-1][0] += value
+        self.mixing_bowls[mixingbowl][-1][0] += value
         
     def removeingredient(self, ingredient, mixingbowl):
         """
@@ -766,7 +832,7 @@ class Chef:
         if value == None:
             value = 0
         
-        self.mixingbowls[key][-1][0] -= value
+        self.mixing_bowls[key][-1][0] -= value
         
     def combineingredient(self, ingredient, mixingbowl):
         """
@@ -783,7 +849,7 @@ class Chef:
         if value == None:
             value = 0
         
-        self.mixingbowls[key][-1][0] *= value
+        self.mixing_bowls[key][-1][0] *= value
         
     def divideingredient(self, 
                          ingredient, 
@@ -821,7 +887,7 @@ class Chef:
         ##  <key> is the bowl
         ##  <-1> indicates the top ingredient, which is a list with entries [value, wet/dry, name]
         ##  <0> is the first entry in that list, i.e. the ingredient's value.
-        self.mixingbowls[key][-1][0] = float(self.mixingbowls[key][-1][0]/value)
+        self.mixing_bowls[key][-1][0] = float(self.mixing_bowls[key][-1][0]/value)
     
     
     def pour(self,
@@ -854,11 +920,11 @@ class Chef:
         bakingdish = int(bakingdish[:-2]) if bakingdish else DEFAULT_DISH
         
         ## Create the baking dish if necessary
-        if not bakingdish in self.bakingdishes:                    
-            self.bakingdishes[bakingdish] = []
+        if not bakingdish in self.baking_dishes:                    
+            self.baking_dishes[bakingdish] = []
         
         ## Copy contents of mixing bowl into baking dish
-        self.bakingdishes[bakingdish].extend(self.mixingbowls[mixingbowl]) 
+        self.baking_dishes[bakingdish].extend(self.mixing_bowls[mixingbowl]) 
         
     
     def stir(self,
@@ -893,13 +959,13 @@ class Chef:
             
         else:
             ## If no mixing bowl was named, there must only be one mixing bowl in the recipe.
-            assert len(self.mixingbowls) == 1
+            assert len(self.mixing_bowls) == 1
         
-        if key not in self.mixingbowls:
+        if key not in self.mixing_bowls:
             self.syntax_error(f"Mixing bowl {str(key)} not found.")
         
         ## If the mixing bowl is empty, nothing happens.
-        if not self.mixingbowls[key]: return
+        if not self.mixing_bowls[key]: return
             
         ## We treat the "top" item in the mixing bowl as the last item in the list.
         ## That's because push and pop operate on last items rather than first.
@@ -914,11 +980,11 @@ class Chef:
         ##      [4, 1, 3, 2]
         
         ## Remove the top ingredient
-        ing = self.mixingbowls[key].pop() # e.g. [4, 3, 2]
+        ing = self.mixing_bowls[key].pop() # e.g. [4, 3, 2]
         
         ## Insert the top ingredient at place <value>
         ## Location is <value> from the *end*, so multiply <value> by -1.
-        self.mixingbowls[key].insert(-1*value,ing)
+        self.mixing_bowls[key].insert(-1*value,ing)
             
     
 
@@ -955,7 +1021,7 @@ class Chef:
             ## (.*): Create a group, (), that matches any text or whitespace, ., except \n multiple times, *
             ## \.: match the full stop character . exactly
             ## \n\n: match two newline characters exactly
-            "(.*)\.\n\n",
+            "(.*\.)\n\n",
             self.script)
         
         ## We expect exactly one result.
@@ -989,7 +1055,7 @@ class Chef:
         ## We have not yet figured out what the comment is, or if it even exists.
         
         ## First, get a copy of the script with the recipe name, first full stop and newlines removed.
-        script_without_recipename = re.sub(self.recipename+"\.\n\n", "", self.script)
+        script_without_recipename = re.sub(self.recipename+"\n\n", "", self.script)
         
         ## Now get the first thing that matches a paragraph.
         match_comment = re.match(
@@ -1011,6 +1077,46 @@ class Chef:
         return self._comment
     
     @property
+    def ingredients_text(self)->str:
+        """
+        Lazy instantiation of the raw text listing the recipe's ingredients.
+
+        Returns
+        -------
+        str
+            ingredients list as it appears in the raw chef script.
+
+        """
+        
+        if hasattr(self,"_ingredients_text"): return self._ingredients_text
+        
+        ## Create the regex.
+        ingredients_text_regex = "(Ingredients..*?)Method.\n"
+        
+        ## Find the ingredients in the script.
+        ingredients_search = re.search(ingredients_text_regex, self.script, re.DOTALL)
+        
+        ## If this doesn't exist, it's a syntax error.
+        if not ingredients_search: self.syntax_error("Ingredients list not found.")
+        
+        ## Define the ingredients text to provisionally be what was found between 
+        ##  'Ingredients.' and 'Method.'
+        self._ingredients_text = ingredients_search.group(1)
+        
+        ## Remove cooking time statement if it exists.
+        self._ingredients_text = re.sub("\nCooking time:(.*)", "", self._ingredients_text, re.DOTALL)
+        
+        ## Remove Pre-heat oven statement if it exists.
+        self._ingredients_text = re.sub("\nPre-heat oven(.*)", "", self._ingredients_text, re.DOTALL)
+        
+        ## Strip any remaining whitespace on the right, except for a final newline
+        self._ingredients_text = self._ingredients_text.rstrip() + "\n"
+        
+        ## Return the private class attribute
+        return self._ingredients_text
+        
+    
+    @property
     def ingredients(self)->dict:
         """
         Lazy instantiation of the recipe ingredients.
@@ -1029,23 +1135,11 @@ class Chef:
         
         if hasattr(self,"_ingredients"): return self._ingredients
         
-        ## Get a copy of the script without the title or comment
-        ## First remove the title
-        script_up_to_ingredients = re.sub(self.recipename+"\.\n\n", "", self.script)
-        
-        ## Now remove the comment, if there is one
-        if self.comment is not None:
-            script_up_to_ingredients = script_up_to_ingredients.replace(self.comment+"\n\n", "")
-        
-        ## Now the beginning of script_up_to_ingredients is "Ingredients.\n"
-        ingredients_header = re.match("Ingredients\.\n", script_up_to_ingredients)
-        
-        if ingredients_header is None:
-            logger.error("Ingredient list not found")
-            sys.exit(-1)
+        ## Get raw text
+        ingredients_text = self.ingredients_text
             
-        ## Again, replace with nothing.
-        script_up_to_ingredients = script_up_to_ingredients.replace("Ingredients.\n","")
+        ## Replace the 'Ingredients.' declaration.
+        ingredients_text = ingredients_text.replace("Ingredients.\n","")
         
         ## Match all of the individual ingredients.
         ingredients_match = re.findall(
@@ -1056,7 +1150,7 @@ class Chef:
             ##  ?: There may or may not be a(nother) single whitespace
             ## ([a-zA-Z0-9 ]+): There needs to be an ingredinent name, which can contain whitespaces and numbers
             "(([0-9]*) ?(k?g|pinch(?:es)?|m?l|dash(?:es)?|cups?|teaspoons?|tablespoons?)? ?([a-zA-Z0-9 ]+)\n)", 
-            script_up_to_ingredients)
+            ingredients_text)
         
         self._ingredients = {}
         
@@ -1065,10 +1159,10 @@ class Chef:
             
             ## Check the thing matched really is in the string
             ## (I don't know how it couldn't be, but I'm leaving this check here just in case.)
-            if re.match(ingredient[0], script_up_to_ingredients) is not None:
+            if re.match(ingredient[0], ingredients_text) is not None:
                 
                 ## Delete this ingredient from the recipe string
-                script_up_to_ingredients = script_up_to_ingredients.replace(ingredient[0], "")
+                ingredients_text = ingredients_text.replace(ingredient[0], "")
             
             ## Dry or liquid? Check the unit of measure.
             ##  Note that chr() is not run on values until output.
@@ -1097,6 +1191,38 @@ class Chef:
         return self._ingredients
     
     @property
+    def method_text(self)->str:
+        """
+        The raw text of the method.
+
+        Returns
+        -------
+        str
+            Method i.e. recipe instruction, as raw text.
+
+        """
+        
+        ## Lazy instantiation
+        if hasattr(self,"_method_text"): return self._method_text
+        
+        ## Regex to find just the method text.
+        method_text_regex = "Method\.(.*?)\n\n"
+        
+        ## Find the method text.
+        method_text_search = re.search(method_text_regex,
+                                       self.script,
+                                       flags = re.DOTALL)
+        
+        ## If not found, it's a syntax error.
+        if not method_text_search: self.syntax_error("Method not found.")
+        
+        ## Create class attribute and return it
+        self._method_text = method_text_search.group(0)
+        
+        return self._method_text
+        
+    
+    @property
     def method(self)->list:
         """
         Lazy instantiation to get the method of this recipe.
@@ -1112,24 +1238,11 @@ class Chef:
         ## Have we already extracted the method?
         if hasattr(self,"_method"): return self._method
         
-        ## We haven't yet found the method so we need to find it now.
-        ## First get a copy of <self.script>, deleting everything up to and including 
-        ##  the line declaring the start of the method.
-        match_method_to_end = re.sub(
-            "(.*?)Method.\n", # find everything up to and including the method declaration
-            "", # replace with "" i.e. delete it all
-            self.script, 
-            flags=re.DOTALL, # the dot character . matches newlines
-            count=1) # Just delete everything up to the FIRST method declaration.
-                     # Required because there might be auxiliary recipes.
-        
-        ## From here, each method step is one newline after another,
-        ##  all the way until we reach two newlines.
-        match_method = re.match("(.*?)\n\n", match_method_to_end, re.DOTALL)
         
         ## Extract the method steps as a list of strings,
-        ##  omitting the entries corresponding to the final two newlines.
-        self._method = match_method.group().split('\n')[:-2]
+        ##  omitting the entries corresponding to the 'Method.' declaration
+        ##  and the final two newlines.
+        self._method = self.method_text.split('\n')[1:-2]
         
         return self._method
     
@@ -1203,6 +1316,104 @@ class Chef:
         
         return self._has_multiple_dishes
     
+    @property
+    def auxiliary_recipes(self)->dict:
+        """
+        Auxiliary Recipes
+        These are small recipes which are needed to produce specialised ingredients 
+         for the main recipe (such as sauces). 
+        They are listed after the main recipe. 
+        Auxiliary recipes are made by sous-chefs, so they have their own set
+         of mixing bowls and baking dishes which the head Chef never sees, 
+         but take copies of all the mixing bowls and baking dishes 
+         currently in use by the calling chef when they are called upon. 
+        When the auxiliary recipe is finished, the ingredients in its first mixing bowl 
+         are placed in the same order into the calling chef's first mixing bowl.
+
+        For example, the main recipe calls for a sauce at some point. 
+        The sauce recipe is begun by the sous-chef with an exact copy 
+         of all the calling chef's mixing bowls and baking dishes. 
+        Changes to these bowls and dishes do not affect the calling chef's bowls and dishes. 
+        When the sous-chef is finished, he passes his first mixing bowl 
+         back to the calling chef, who empties it into his first mixing bowl.
+
+        An auxiliary recipe may have all the same items as a main recipe.
+
+        Returns
+        -------
+        dict
+            keys are auxiliary recipe names,
+            values are dicts with {"script": <SCRIPT OF AUXILIARY RECIPE>}
+
+        """
+        
+        ## Lazy instantiation
+        if hasattr(self,"_auxiliary_recipes"): return self._auxiliary_recipes
+        
+        ## Default to empty list
+        self._auxiliary_recipes = {}
+        
+        ## Regex to see if auxiliary recipes exist.
+        ## Get a copy of the full script, start chopping it down, 
+        ##  pulling each auxiliary recipe's script into the dict as we go.
+        script_editable = copy.copy(self.script)
+        
+        ## Remove the current title.
+        script_editable = script_editable.replace(self.recipename,"")
+        
+        ## Remove the comment.
+        script_editable = script_editable.replace(self.comment,"")
+        
+        ## Remove the ingredients text.
+        script_editable = script_editable.replace(self.ingredients_text,"")
+        
+        ## Remove cooking time statement if it exists.
+        script_editable = re.sub("Cooking time:(.*)", "", script_editable)
+        
+        ## Remove Pre-heat oven statement if it exists.
+        script_editable = re.sub("Pre-heat oven(.*)", "", script_editable)
+        
+        ## Remove the method text.
+        script_editable = script_editable.replace(self.method_text,"")
+        
+        ## Remove the Serves statement if it exists.
+        script_editable = re.sub("Serves(.*)", "", script_editable)
+        
+        ## Left-strip.
+        script_editable = script_editable.lstrip()
+        
+        ## At this point we are just left with any auxiliary recipes there may be.
+        ## We will proceed on the assumption that auxiliary recipes don't have 
+        ##  comments, oven statements or Serves statements.
+        
+        ## If there is no text left at this point, there are no auxiliary recipes.
+        if script_editable == "": return self._auxiliary_recipes
+        
+        ## Split remaining text by each pair of newlines.
+        auxiliaries_raw = script_editable.split("\n\n")
+        
+        while len(auxiliaries_raw) > 0:
+            
+            ## First entry is the name of the auxiliary recipe.
+            ## Second entry is ingredients.
+            ## Third entry is method.
+            auxiliary_script = auxiliaries_raw[0] + "\n\n" +\
+                               auxiliaries_raw[1] + "\n\n" +\
+                               auxiliaries_raw[2] + "\n\n"
+            
+            ## Bundle everything together
+            self._auxiliary_recipes[auxiliaries_raw[0]] = {
+                "ingredients_text" : auxiliaries_raw[1],
+                "method_text" : auxiliaries_raw[2],
+                "script" : auxiliary_script
+                }
+            
+            ## Remove these three entries from the list.
+            auxiliaries_raw = auxiliaries_raw[3:]
+        
+        return self._auxiliary_recipes
+    
+    
 def load(fpath):
     """
     Load a recipe into a Chef object and return the object without parsing.
@@ -1226,7 +1437,7 @@ def load(fpath):
 
 if __name__ == "__main__":
         
-    with open("recipes/helloworld.chef", "r",encoding='utf-8') as f:
+    with open("recipes/hello_sous.chef", "r",encoding='utf-8') as f:
         main = Chef(f.read())
     
     main.cook()
