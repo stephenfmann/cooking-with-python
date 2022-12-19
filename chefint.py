@@ -31,8 +31,8 @@ class Chef:
     
     def __init__(self, 
                  script, 
-                 mixing_bowls = {DEFAULT_BOWL: []},
-                 baking_dishes = {DEFAULT_DISH: []}
+                 mixing_bowls = None,
+                 baking_dishes = None
                  ):
         
         ## Initialise and set object properties.
@@ -43,12 +43,32 @@ class Chef:
         ##  from the calling recipe.
         ## The calling method should have already created copies of these,
         ##  so we are free to change them at will.
-        self.mixing_bowls    = mixing_bowls
-        self.baking_dishes   = baking_dishes
         
-        ## Initialise boolean to say whether the meal is refrigerated or not.
+        self.mixing_bowls    = mixing_bowls if mixing_bowls else {DEFAULT_BOWL: []}
+        self.baking_dishes   = baking_dishes if baking_dishes else {DEFAULT_DISH: []}
+        
+        ## Initialise boolean to say whether the meal is cooked and/or refrigerated.
+        self.cooked = False
         self.refrigerated = False
     
+    def initialise(self)->None:
+        """
+        Remove all values and prepare to cook.
+
+        Returns
+        -------
+        None
+            DESCRIPTION.
+
+        """
+        
+        self.mixing_bowls    = {DEFAULT_BOWL: []}
+        self.baking_dishes   = {DEFAULT_DISH: []}
+        
+        ## Initialise boolean to say whether the meal is cooked and/or refrigerated.
+        self.cooked = False
+        self.refrigerated = False
+        
     
     def syntax_error(self,message)->None:
         """
@@ -81,10 +101,13 @@ class Chef:
         logger.error(f"Runtime error on line {self.current_instruction_line}: {message}")
         sys.exit(-1)
     
-    def cook(self,debug=True)->None:
+    def cook(self,debug=False)->None:
         """
         Step through the recipe's Method and execute each line.
         """
+        
+        ## Initialise
+        if self.cooked: self.initialise()
         
         ## We use a global counter to remember where we are in the recipe.
         ## This helps when jumping into and out of loops and error reporting.
@@ -118,7 +141,8 @@ class Chef:
         
         ## Serve the finished dish.
         if not self.refrigerated: self.serve()
-    
+        
+        self.cooked = True
     
     def cook_loop(self,
                   method_lines,
@@ -139,10 +163,15 @@ class Chef:
         """
         
         ## The instruction `Set aside.` will cause this loop to immediately terminate.
-        set_aside = False
+        set_aside = False        
         
         ## Only enter the loop if the ingredient value is non-zero.
-        while self.ingredients[ingredient_name_start] != 0:
+        while self.ingredients[ingredient_name_start][0] != 0:
+            
+            # print(f"Start: {ingredient_name_start}") # debug
+            # print(self.ingredients[ingredient_name_start][0]) # debug
+            # print(f"End: {ingredient_name_end}") # debug
+            # print(self.ingredients[ingredient_name_end][0]) # debug
             
             ## Run through the entire loop (unless `Set aside.` is encountered.)
             for line_number, instruction in method_lines.items():
@@ -150,8 +179,19 @@ class Chef:
                 ## Set current line number.
                 self.current_instruction_line = line_number
                 
+                ## Debug
+                # print(f"In loop: Executing {instruction}")
+                
+                ## Is this the final line of the loop?
+                if line_number == max(method_lines.keys()): break
+                
                 ## Execute current instruction.
                 set_aside = self.parse_instruction(instruction)
+                
+                ## debug
+                if str(self.ingredients[ingredient_name_start][0]) == "nan":
+                    print(f"Broke on line {line_number}: {instruction}")
+                    sys.exit(-1)
                 
                 ## `Set aside.` causes the loop to end immediately.
                 if set_aside: break
@@ -162,7 +202,9 @@ class Chef:
             ## "If the ingredient appears in this statement, 
             ##   its value is decremented by 1 when this statement executes."
             if ingredient_name_end is not None:
-                self.ingredients[ingredient_name_end] -= 1
+                self.ingredients[ingredient_name_end][0] -= 1
+            
+            # print(self.ingredients[ingredient_name_start][0]) # debug
         
         ## If this recipe has been refrigerated,
         ##  tell any outer loops we may be in that they can "Set aside"
@@ -260,7 +302,7 @@ class Chef:
         ##  `Put ingredient into [nth] mixing bowl.`
         ## This puts the ingredient into the nth mixing bowl.
         ## Create the regex.
-        put_regex = "^Put (?:the )?([a-zA-Z ]+) into (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?mixing bowl"
+        put_regex = "Put (?:the )?([a-zA-Z ]+) into (?:the )?(?:([1-9]\d*)(?:st|nd|rd|th) )?mixing bowl"
         
         ## See if the current line fits this regex.
         put = re.search(put_regex, instruction)
@@ -614,7 +656,7 @@ class Chef:
         aux_regex = "Serve with ([a-zA-Z ]+\.)"
         
         ## See if this line matches the syntax.
-        auxiliary = re.match(aux_regex, instruction)
+        auxiliary = re.search(aux_regex, instruction)
         
         ## This line is calling for a sous-chef!
         if auxiliary != None:      
@@ -641,7 +683,7 @@ class Chef:
         stir_regex = "Stir(?: the (1st|2nd|3rd|[0-9]+th) mixing bowl)? for ([1-9]+) minutes?"
         
         ## See if this line matches.
-        stir = re.match(stir_regex, instruction)
+        stir = re.search(stir_regex, instruction)
         
         ## If it matches...
         if stir != None:
@@ -669,7 +711,7 @@ class Chef:
         stir2_regex = "Stir (a-zA-Z0-9 )+ into the (1st|2nd|3rd|[0-9]+th) mixing bowl"
         
         ## See if this line matches.
-        stir = re.match(stir2_regex, instruction)
+        stir = re.search(stir2_regex, instruction)
         
         ## If it matches...
         if stir != None:
@@ -684,54 +726,108 @@ class Chef:
             return
         
         
-        ## Q. No standard keyword: look for a verb to begin a loop
-        verb = re.search("([a-zA-Z]+) the ([a-zA-Z ]+) ?(?!until)", instruction)
-        if verb != None:                
-            if "until" in verb.group():
-                return
-            if not verb.group(2) in self.ingredients:    # verb.group(2) is the ingredient
-                return
-            if self.ingredients[verb.group(2)][0] == 0:
-                return
-            else:
-                ## Verb Maintenance
-                if verb.group(1)[-1] == "e":
-                    verbw = verb.group(1)[:-1]          # Verbs that end in e need to drop it before adding ed below.
-                elif verb.group(1)[-1] == "y":
-                    verbw = verb.group(1)[:-1] + "i"    # Verbs that end in y need to swap it for an i before adding ed.
-                else:
-                    verbw = verb.group(1)               # Any other verbs just need ed adding below.
+        ## Q. No standard keyword: look for a verb to begin a loop.
+        ##  `Verb the ingredient.`
+        ## This marks the beginning of a loop. 
+        ## It must appear as a matched pair with the following statement. 
+        ## The loop executes as follows: The value of `ingredient` is checked. 
+        ## If it is non-zero, the body of the loop executes until 
+        ##  it reaches the "until" statement. 
+        ## The value of ingredient is rechecked. If it is non-zero, the loop executes again. 
+        ## If at any check the value of ingredient is zero, the loop exits 
+        ##  and execution continues at the statement after the "until". 
+        ## Loops may be nested.
+        
+        ## Create regex.
+        verb_regex_start = "([a-zA-Z]+) the ([a-zA-Z ]+)\."
+        # verb_regex = "([a-zA-Z]+) the ([a-zA-Z ]+) ?(?!until)"
+        
+        ## See if this line matches.
+        verb_search = re.search(verb_regex_start, instruction)
+        
+        if verb_search != None:   
+             
+            ## It matches, so we're at the beginning of a loop.
+            ## Find the end of the loop, and pass all the instructions
+            ##  within the loop to self.cook_loop().
+            index_loop_start = self.current_instruction_line
+            
+            ## Define the regex that will match the end of this loop.
+            ## First, get the past tense of the current verb.
+            verb_present = verb_past = verb_search.group(1)
+            
+            ## Verbs that end in e need to drop it before adding "ed"
+            if verb_past[-1] == "e": verb_past = verb_past[:-1]
+            
+            ## Verbs that end in y need to swap it for an i before adding "ed"
+            if verb_past[-1] == "y": verb_past = verb_past[:-1] + "i"
+            
+            ## Now add "ed" to get the past tense.
+            verb_past += "ed"
+            
+            ## Convert to lower case 
+            verb_past = verb_past.lower()
+            
+            ## Create the regex.
+            ##  `Verb [the ingredient] until verbed.`
+            ## This marks the end of a loop. 
+            ## It must appear as a matched pair with the above statement. 
+            ## `verbed` must match the `Verb` in the matching loop start statement. 
+            ## The Verb in this statement may be arbitrary and is ignored. 
+            ## If the ingredient appears in this statement, 
+            ##  its value is decremented by 1 when this statement executes. 
+            ## The ingredient does not have to match the ingredient in the 
+            ##  matching loop start statement.
+            ## Create the regex.
+            verb_regex_end = f"([a-zA-Z]+) (the ([a-zA-Z ]+))? until {verb_past}\."
+            
+            ## Step through each future line, checking whether it ends this loop.
+            
+            ## Initialise variables for loop
+            ## Use indices to list method lines
+            index_loop_end = index_loop_start
+            
+            ## Use a dict with line numbers as keys
+            ## Don't include the first line or you get an infinite loop!
+            # method_lines = {index_loop_start:instruction}
+            method_lines = {} # debug, make it class property
+            
+            while index_loop_end < len(self.method):
                 
-                ## Find everything in between the loop 
-                ## TODO - watch out for nested loops with the same verb!
+                ## Increment the index.
+                index_loop_end += 1
                 
-                re_text = verb.group() + "\.((.*?)\s+[a-zA-Z]+ ?(?:(the )?([a-zA-Z ]+))? ?until " + verbw + "ed)"
+                method_lines[index_loop_end] = self.method[index_loop_end]
                 
-                looptext = re.search(re_text, self.script, re.DOTALL|re.IGNORECASE)
+                # print(method_lines) # debug
                 
-                if not looptext:
-                    logger.error(f'Verb unmatched. Could not find "{re_text}" in "{instruction}"')
-                    raise IOError
+                ## Check whether the loop-ending regex matches this line.
+                verb_end_match = re.search(verb_regex_end,
+                                          self.method[index_loop_end]
+                                          )
                 
-                # deltext =  re.split("\.\s+", looptext.group(1))
-                # deltext = map(stripwhite, deltext)
-                # for d in deltext:
-                #     excode.remove(d)
-                while self.ingredients[verb.group(2)][0] != 0:
-                    r = self.execute(looptext.group(2), True)
-                    if r == "ENDOFLOOP":
-                        break
-                    if looptext.group(3) != None:
-                        if looptext.group(3) == 'the ':
-                            ing = looptext.group(4).rstrip()
-                        else:
-                            ing = looptext.group(3).rstrip()
-                        self.ingredients[ing][0] -= 1
+                ## Does this method line end the current loop?
+                if verb_end_match != None:
+                    
+                    ## Yes: call cook-loop
+                    ingredient_name_start = verb_search.group(2)
+                    ingredient_name_end   = verb_end_match.group(3)
+                    
+                    return self.cook_loop(
+                                method_lines            = method_lines, 
+                                ingredient_name_start   = ingredient_name_start,
+                                ingredient_name_end     = ingredient_name_end
+                                )
+            
+            ## Error: couldn't find end of loop.
+            self.syntax_error(f'Verb unmatched. Could not find "{verb_past}".')
+            
+            return
         
         
-        ## Looks like nothing happened.
-        ## This instruction contains no recognisable code,
-        ##  so flag it as a syntax error.
+        ## If the method reaches this point,
+        ##  no recognisable instruction was found.
+        ## That's a syntax error.
         self.syntax_error(f"Instruction not recognised: {instruction}")
     
     
@@ -793,13 +889,15 @@ class Chef:
         if not mixingbowl: mixingbowl = DEFAULT_BOWL
         
         ## Check the ingredient exists
-        if ingredient not in self.ingredients: self.syntax_error(f"Ingredient not found: {ingredient}")
+        if ingredient not in self.ingredients: 
+            self.syntax_error(f"Ingredient not found: {ingredient}")
         
         ## Check the mixing bowl exists
-        if mixingbowl not in self.mixing_bowls: self.runtime_error(f"Mixing bowl {mixingbowl} does not exist.")
+        if mixingbowl not in self.mixing_bowls: 
+            self.runtime_error(f"Mixing bowl {mixingbowl} does not exist.")
         
         ## Add ingredient to top of mixingbowl
-        self.mixing_bowls[mixingbowl].append(self.ingredients[ingredient])
+        self.mixing_bowls[mixingbowl].append(copy.copy(self.ingredients[ingredient]))
         
         
     def fold(self, 
@@ -886,6 +984,8 @@ class Chef:
             Multiply the value of <ingredient> by the value of the ingredient 
              on top of the mixing bowl and store the result in the mixing bowl.
         """
+        
+        
         
         value = self.ingredients[ingredient][0]
         
@@ -1484,7 +1584,7 @@ def load(fpath):
 
 if __name__ == "__main__":
         
-    with open("recipes/hello_sous.chef", "r",encoding='utf-8') as f:
+    with open("recipes/cherrypi.chef", "r",encoding='utf-8') as f:
         main = Chef(f.read())
     
-    main.cook()
+    # main.cook()
