@@ -626,16 +626,63 @@ class Chef:
                 )                         
             
             return
+        
+        
+        ## P1. Stir
+        ##  `Stir [the [nth] mixing bowl] for number minutes.`
+        ## This "rolls" the top number ingredients in the nth mixing bowl, 
+        ##  such that the top ingredient goes down that number of ingredients 
+        ##  and all ingredients above it rise one place. 
+        ## If there are not that many ingredients in the bowl, 
+        ##  the top ingredient goes to tbe bottom of the bowl 
+        ##  and all the others rise one place.
+        
+        ## Create regex
+        stir_regex = "Stir(?: the (1st|2nd|3rd|[0-9]+th) mixing bowl)? for ([1-9]+) minutes?"
+        
+        ## See if this line matches.
+        stir = re.match(stir_regex, instruction)
+        
+        ## If it matches...
+        if stir != None:
             
+            ## ...stir the bowl the specified amount.
+            self.stir(
+                mixingbowl  = stir.group(1),
+                minutes     = stir.group(2),
+                ingredient  = None
+                )
+            
+            return
         
         
-        ## P. Stir
-        stir = re.match("Stir(?: the (1st|2nd|3rd|[0-9]+th) mixing bowl)? for ([1-9]+) minutes?", instruction)
+        ## P2. Stir into
+        ##  `Stir ingredient into the [nth] mixing bowl.`
+        ## This rolls the number of ingredients in the nth mixing bowl 
+        ##  equal to the value of ingredient, such that the top ingredient 
+        ##  goes down that number of ingredients and all ingredients above it rise one place. 
+        ## If there are not that many ingredients in the bowl, 
+        ##  the top ingredient goes to the bottom of the bowl 
+        ##  and all the others rise one place.
+        
+        ## Create regex.
+        stir2_regex = "Stir (a-zA-Z0-9 )+ into the (1st|2nd|3rd|[0-9]+th) mixing bowl"
+        
+        ## See if this line matches.
+        stir = re.match(stir2_regex, instruction)
+        
+        ## If it matches...
         if stir != None:
-            self.stir(stir.group(1),stir.group(2),None)    #Args: mixingbowl, minutes, ingredient
-        stir = re.match("Stir (a-zA-Z0-9 )+ into the (1st|2nd|3rd|[0-9]+th) mixing bowl", instruction)
-        if stir != None:
-            self.stir(stir.group(2),0,stir.group(1))    #Args: mixingbowl, minutes, ingredient
+            
+            ## ...stir the bowl the specified amount.
+            self.stir(
+                mixingbowl  = stir.group(2),
+                minutes     = 0,
+                ingredient  = stir.group(1)
+                )
+            
+            return
+        
         
         ## Q. No standard keyword: look for a verb to begin a loop
         verb = re.search("([a-zA-Z]+) the ([a-zA-Z ]+) ?(?!until)", instruction)
