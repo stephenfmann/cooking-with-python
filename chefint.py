@@ -311,7 +311,10 @@ class Chef:
         if put != None:
             
             ## ...call the put() method...
-            self.put(ingredient=put.group(1), mixingbowl=put.group(2))
+            self.put(
+                ingredient = put.group(1), 
+                mixingbowl = int(put.group(2))
+                )
             
             ## ...and return, so the calling method can move to the next instruction.
             return
@@ -335,7 +338,10 @@ class Chef:
                 self.syntax_error("Bowl number unspecified.") 
             
             ## ...call the fold() method...
-            self.fold(fold.group(1), fold.group(2))
+            self.fold(
+                ingredient = fold.group(1), 
+                mixingbowl = int(fold.group(2)[:-2])
+                )
             
             ## ...and return, so the calling method can move to the next instruction.
             return
@@ -359,7 +365,10 @@ class Chef:
                 self.syntax_error("Bowl number unspecified.") 
             
             ## ...call the addingredient() method...
-            self.addingredient(add.group(1), add.group(2))
+            self.addingredient(
+                ingredient = add.group(1), 
+                mixingbowl = int(add.group(2)[:-2])
+                )
             
             ## ...and return, so the calling method can move to the next instruction.
             return
@@ -383,7 +392,10 @@ class Chef:
                 self.syntax_error("Bowl number unspecified.") 
             
             ## ...call the removeingredient() method...
-            self.removeingredient(remove.group(1), remove.group(2))
+            self.removeingredient(
+                ingredient = remove.group(1), 
+                mixingbowl = int(remove.group(2)[:-2])
+                )
             
             ## ...and return, so the calling method can move to the next instruction.
             return
@@ -407,7 +419,10 @@ class Chef:
                 self.syntax_error("Bowl number unspecified.")
             
             ## ...call the combineingredient() method...
-            self.combineingredient(combine.group(1), combine.group(2))
+            self.combineingredient(
+                ingredient = combine.group(1), 
+                mixingbowl = int(combine.group(2)[:-2])
+                )
             
             ## ...and return, so the calling method can move to the next instruction.
             return
@@ -431,7 +446,10 @@ class Chef:
                 self.syntax_error("Bowl number unspecified.")
             
             ## ...call the divideingredient() method...
-            self.divideingredient(divide.group(1), divide.group(2))
+            self.divideingredient(
+                ingredient = divide.group(1), 
+                mixingbowl = int(divide.group(2)[:-2])
+                )
             
             ## ...and return, so the calling method can move to the next instruction.
             return
@@ -515,7 +533,7 @@ class Chef:
         ##  `Mix [the [nth] mixing bowl] well.`
         ## This randomises the order of the ingredients in the nth mixing bowl.
         ## Create the regex.
-        mix_regex = "Mix the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl well"
+        mix_regex = "Mix (the (1st|2nd|3rd|[0-9]+th)? ?mixing bowl )?well"
         
         ## See if the current line fits this regex.
         mix = re.search(mix_regex, instruction)
@@ -524,11 +542,11 @@ class Chef:
         if mix != None:
             
             ## ...ensure that if the bowl number wasn't specified, there is only one bowl...
-            if mix.group(1) == None and self.has_multiple_bowls:                    
+            if mix.group(2) == None and self.has_multiple_bowls:                    
                 self.syntax_error("Bowl number unspecified.")
             
             ## ...explicitly define the bowl number...
-            bowl_number = int(mix.group(1)[:-2]) if mix.group(1) is not None else DEFAULT_BOWL
+            bowl_number = int(mix.group(2)[:-2]) if mix.group(2) is not None else DEFAULT_BOWL
             
             ## ...randomise the ingredients in that bowl...
             random.shuffle(self.mixing_bowls[bowl_number])
@@ -708,7 +726,7 @@ class Chef:
         ##  and all the others rise one place.
         
         ## Create regex.
-        stir2_regex = "Stir (a-zA-Z0-9 )+ into the (1st|2nd|3rd|[0-9]+th) mixing bowl"
+        stir2_regex = "Stir ([a-zA-Z0-9 ]+) into the (1st|2nd|3rd|[0-9]+th) mixing bowl"
         
         ## See if this line matches.
         stir = re.search(stir2_regex, instruction)
@@ -916,16 +934,15 @@ class Chef:
         ----------
         ingredient : str
             Name of ingredient whose value will be replaced.
-        mixingbowl : str
-            Ordinal numeral name of mixing bowl whose top ingredient's value
+        mixingbowl : int
+            Index of mixing bowl whose top ingredient's value
              will replace the value of <ingredient>.
 
         """
         
         ## Determine which mixing bowl to use.
         key = DEFAULT_BOWL
-        if mixingbowl:
-            key = int(mixingbowl[:-2])
+        if mixingbowl: key = mixingbowl
         
         ## Get the ingredient out of the bowl
         full_ingredient = self.mixing_bowls[key].pop()
@@ -947,10 +964,12 @@ class Chef:
         if not mixingbowl: mixingbowl = DEFAULT_BOWL
         
         ## Check the ingredient exists
-        if ingredient not in self.ingredients: self.syntax_error(f"Ingredient not found: {ingredient}")
+        if ingredient not in self.ingredients: 
+            self.syntax_error(f"Ingredient not found: {ingredient}")
         
         ## Check the mixing bowl exists
-        if mixingbowl not in self.mixing_bowls: self.runtime_error(f"Mixing bowl {mixingbowl} does not exist.")
+        if mixingbowl not in self.mixing_bowls: 
+            self.runtime_error(f"Mixing bowl {mixingbowl} does not exist.")
         
         ## Get the value of the ingredient
         value = self.ingredients[ingredient][0]
@@ -962,17 +981,29 @@ class Chef:
         ## We add the specified ingredient's value to that.
         self.mixing_bowls[mixingbowl][-1][0] += value
         
-    def removeingredient(self, ingredient, mixingbowl):
+    def removeingredient(self, ingredient, mixingbowl)->None:
         """
-            Subtract the value of <ingredient> from the value of the ingredient 
-             on top of the mixing bowl and store the result in the mixing bowl.
+        Subtract the value of <ingredient> from the value of the ingredient 
+         on top of the mixing bowl and store the result in the mixing bowl.
+
+        Parameters
+        ----------
+        ingredient : str
+            Name of ingredient.
+        mixingbowl : int
+            Number index of mixing bowl.
+
+        Returns
+        -------
+        None
+
         """
         
         value = self.ingredients[ingredient][0]
         
         key = DEFAULT_BOWL
         if mixingbowl:
-            key = mixingbowl[:-2]
+            key = mixingbowl
             
         if value == None:
             value = 0
@@ -991,7 +1022,7 @@ class Chef:
         
         key = DEFAULT_BOWL
         if mixingbowl:
-            key = mixingbowl[:-2]
+            key = mixingbowl
             
         if value == None:
             value = 0
@@ -1024,7 +1055,7 @@ class Chef:
         ## Get the mixing bowl number.
         key = DEFAULT_BOWL
         if mixingbowl:
-            key = mixingbowl[:-2] ## Get the integer (as string) from the ordinal numeral.
+            key = mixingbowl ## Get the integer (as string) from the ordinal numeral.
         
         ## Ingredients with no value are assumed to leave the mixing bowl unchanged.
         if value == None:
@@ -1201,8 +1232,10 @@ class Chef:
         
         ## We have not yet figured out what the comment is, or if it even exists.
         
-        ## First, get a copy of the script with the recipe name, first full stop and newlines removed.
-        script_without_recipename = re.sub(self.recipename+"\n\n", "", self.script)
+        ## First, get a copy of the script with the recipe name, 
+        ##  first full stop and newlines removed.
+        script_without_recipename = self.script.replace(self.recipename+"\n\n", "")
+        # script_without_recipename = re.sub(self.recipename+"\n\n", "", self.script)
         
         ## Now get the first thing that matches a paragraph.
         match_comment = re.match(
@@ -1296,7 +1329,7 @@ class Chef:
                 ## There may or may not be a unit of measure
             ##  ?: There may or may not be a(nother) single whitespace
             ## ([a-zA-Z0-9 ]+): There needs to be an ingredinent name, which can contain whitespaces and numbers
-            "(([0-9]*) ?(k?g|pinch(?:es)?|m?l|dash(?:es)?|cups?|teaspoons?|tablespoons?)? ?([a-zA-Z0-9 ]+)\n)", 
+            "(([0-9]*) ?((k?g|pinch(?:es)?|m?l|dash(?:es)?|cups?|teaspoons?|tablespoons?) )? ?([a-zA-Z0-9 ]+)\n)", 
             ingredients_text)
         
         self._ingredients = {}
@@ -1315,7 +1348,7 @@ class Chef:
             ##  Note that chr() is not run on values until output.
             ##   This is to allow arithmetic operations on liquids.
             ## There is a pre-defined set of liquid types.
-            if ingredient[2] in ["dash", "cup", "l", "ml", "dashes", "cups"]:
+            if ingredient[3] in ["dash", "cup", "l", "ml", "dashes", "cups"]:
                 
                 ## The quantity is an integer
                 quantity = int(ingredient[1])
@@ -1333,7 +1366,7 @@ class Chef:
                     quantity = None
             
             ## Add the dictionary entry.
-            self._ingredients[ingredient[3]] = [quantity, ingredient_type, ingredient[3]]
+            self._ingredients[ingredient[4]] = [quantity, ingredient_type, ingredient[4]]
         
         return self._ingredients
     
